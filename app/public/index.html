@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>离线阅读器</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="workbench" aria-labelledby="app-title">
+      <div class="masthead">
+        <div>
+         <!-- <p class="eyebrow">Portable Windows archive tool</p> -->
+          <h1 id="app-title">离线阅读器</h1>
+        </div>
+        <div class="masthead-actions">
+          <a class="secondary-link" href="/archive/index.html" target="_blank" rel="noreferrer">阅读</a>
+          <button id="usage-toggle" class="secondary-link" type="button" aria-controls="usage-panel" aria-expanded="false">如何使用</button>
+        </div>
+      </div>
+
+      <section id="usage-panel" class="usage-panel" hidden>
+        <h2>如何使用</h2>
+        <ol>
+          <li><strong>选择来源。</strong>选择“博客”可备份文学城博客分类；选择“论坛”可按文学城 ID 或关键词查找论坛帖子。</li>
+          <li><strong>博客备份。</strong>粘贴博主博客首页网址，例如 <code>https://blog.wenxuecity.com/myoverview/41038/</code>，点击“下一步”，勾选要保存的分类，再点击“开始下载”。</li>
+          <li><strong>论坛备份。</strong>选择“论坛”，点击“下一步”，选择论坛版块；然后用“文学城ID”按作者查找。挑选打算下载的帖子，选中结果后可以“开始下载”。</li>
+          <li><strong>制作合集。</strong>选择“论坛”，点击“下一步”，选择论坛版块；然后用“关键词”按标题查找。选中结果后点击“做合集”。</li>
+		  <li><strong>增量下载。</strong>默认只下载新增文章或帖子；如果想重新下载保存已归档内容，取消“增量下载”。</li>
+          <li><strong>跟帖保存。</strong>勾选“包含跟帖”后，文章页面会尽量保存评论、跟帖和相关资源。</li>
+          <li><strong>离线阅读。</strong>下载完成后点击右上角“阅读”，进入归档首页；也可以在归档页和分类页用搜索框按页面标题查找已保存内容。</li>
+        </ol>
+      </section>
+
+      <form id="inspect-form" class="backup-form">
+        <div class="radio-row" id="source-type-row" style="margin-bottom:8px;">
+          <label class="choice-row">
+            <input type="radio" name="source-type" value="blog" checked>
+            <span>博客</span>
+          </label>          
+          
+          <label class="choice-row" style="margin-right:12px;">
+            <input type="radio" name="source-type" value="bbs">
+            <span>论坛</span>
+          </label>
+
+        </div>
+        <label id="start-url-label">
+          <span>博客首页网址（论坛不用输入网址，点击“下一步”，然后选择论坛）</span> 
+          <input id="start-url" name="startUrl" type="url" placeholder="https://blog.wenxuecity.com/myoverview/41038/" required>
+        </label>
+
+        <label class="check-row">
+          <input id="incremental" name="incremental" type="checkbox" checked>
+          <span>增量下载(仅下载新文章), 不选则重新下载</span>
+        </label>
+
+        <label id="include-comments-row" class="check-row">
+          <input id="include-comments" name="includeComments" type="checkbox">
+          <span>包含跟帖</span>
+        </label>
+
+        <div class="actions">
+          <button id="next-button" type="submit">下一步</button>
+        <!--  <button id="open-archive" type="button">Open Archive</button>
+          <button id="export-zip" type="button">Export ZIP</button>-->
+        </div>
+      </form>
+
+      <section id="category-panel" class="category-panel" hidden>
+        <div id="category-mode">
+          <div class="category-heading">
+            <div>
+              <h2 id="blog-name"></h2>
+              <p id="profile-name" class="muted"></p>
+            </div>
+            <div class="category-tools">
+              <button id="select-all" type="button">全选</button>
+              <button id="select-none" type="button">不选</button>
+            </div>
+          </div>
+          <div id="category-list" class="category-list"></div>
+          <button id="start-button" type="button" hidden>开始下载</button>
+        </div>
+
+        <div id="bbs-mode" hidden>
+          <div class="category-heading">
+            <div>
+              <h2 id="bbs-title"></h2>
+              <p id="bbs-profile-name" class="muted"></p>
+            </div>
+          </div>
+
+          <div class="field-stack">
+            <label>
+              <span>选择论坛：</span>
+              <select id="bbs-forum"></select>
+            </label>
+
+            <div class="radio-row" role="radiogroup" aria-label="BBS search mode">
+              <label class="choice-row">
+                <input type="radio" name="bbs-search-mode" value="author" checked>
+                <span>文学城ID</span>
+              </label>
+              <label class="choice-row">
+                <input type="radio" name="bbs-search-mode" value="title">
+                <span>关键词</span>
+              </label>
+            </div>
+
+            <label>
+              <span id="bbs-keyword-label">文学城ID</span>
+              <input id="bbs-keyword" name="bbsKeyword" type="text" autocomplete="off">
+            </label>
+
+            <button id="bbs-search-button" type="button">下一步</button>
+
+          <div id="bbs-results-panel" class="bbs-results-panel" hidden>
+            <div class="category-heading">
+              <p id="bbs-search-summary" class="muted"></p>
+              <div class="category-tools">
+                <button id="bbs-select-all" type="button">全选</button>
+                <button id="bbs-select-none" type="button">不选</button>
+              </div>
+            </div>
+            <div id="bbs-results-list" class="category-list result-list"></div>
+            <button id="bbs-start-button" type="button" hidden>开始下载</button>
+            <button id="bbs-collection-button" type="button" hidden>做合集</button>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="status-panel" aria-labelledby="status-title">
+      <div id="bbs-collection-output" class="collection-output" hidden></div>
+      <div class="status-heading">
+        <h2 id="status-title">状态</h2>
+        <span id="status-pill" class="status-pill idle">空闲</span>
+      </div>
+      <div id="progress" class="progress-log" role="log" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script src="/app.js?v=usage-hidden-2"></script>
+</body>
+</html>

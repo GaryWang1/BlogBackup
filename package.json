@@ -1,0 +1,21 @@
+{
+  "name": "blog-backup-netlify",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Netlify web version of the Blog Backup offline archive tool.",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "node netlify/scripts/verify-build.cjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^9.1.0",
+    "@netlify/functions": "^4.2.5",
+    "@sparticuz/chromium": "^131.0.1",
+    "archiver": "7.0.1",
+    "cheerio": "1.0.0",
+    "playwright-core": "1.54.2"
+  },
+  "devDependencies": {
+    "netlify-cli": "^22.4.0"
+  }
+}

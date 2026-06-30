@@ -1,0 +1,9 @@
+{
+  "id": "generic",
+  "name": "Generic Article Page",
+  "description": "Works for many sites that use article links and article content.",
+  "articleLinkSelector": "article a[href], .post a[href], .entry-title a[href], h2 a[href], h3 a[href]",
+  "titleSelector": "h1, .entry-title, .post-title, article h1",
+  "contentSelector": "article, .entry-content, .post-content, .content, main",
+  "nextPageSelector": "a[rel='next'], .pagination a.next, .nav-previous a, a.next"
+}

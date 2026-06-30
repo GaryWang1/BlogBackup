@@ -1,0 +1,9 @@
+{
+  "id": "blogger",
+  "name": "Blogger",
+  "description": "Common Blogger/Blogspot selectors.",
+  "articleLinkSelector": ".post-title a[href], h3.post-title a[href], .blog-posts h2 a[href]",
+  "titleSelector": "h1.post-title, h3.post-title, .post-title, h1",
+  "contentSelector": ".post-body, .post, article",
+  "nextPageSelector": "#Blog1_blog-pager-older-link, a.blog-pager-older-link[href], a[rel='next']"
+}

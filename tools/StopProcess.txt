@@ -1,0 +1,8 @@
+Stop the process using port 3000 (Windows PowerShell)
+
+netstat -ano | findstr :3000
+  TCP    127.0.0.1:3000         0.0.0.0:0              LISTENING       19952
+
+taskkill /PID <PID> /F
+
+taskkill /PID 19952 /F

@@ -1,0 +1,11 @@
+{
+  "id": "bbs",
+  "name": "Wenxuecity BBS",
+  "description": "Searches Wenxuecity forum archive results and saves selected posts.",
+  "articleLinkSelector": "a[href]",
+  "titleSelector": "#content h1.title, h1.title",
+  "contentSelector": "#articleBody, #msgbodyContent, #postbody",
+  "sourceCreatedAtSelector": "#postmeta .date",
+  "commentsSelector": "#comment",
+  "nextPageSelector": ""
+}

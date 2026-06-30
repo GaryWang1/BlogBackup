@@ -1,0 +1,9 @@
+{
+  "id": "wordpress",
+  "name": "WordPress",
+  "description": "Common WordPress theme selectors.",
+  "articleLinkSelector": "article .entry-title a[href], article h2 a[href], .post .entry-title a[href]",
+  "titleSelector": "h1.entry-title, article h1, h1",
+  "contentSelector": ".entry-content, article .post-content, article",
+  "nextPageSelector": ".nav-previous a[href], a.next.page-numbers, .pagination a.next, a[rel='next']"
+}

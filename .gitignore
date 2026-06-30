@@ -1,0 +1,14 @@
+node_modules/
+app/server/node_modules/
+app/runtime/
+app/browsers/
+archive/
+exports/
+logs/
+portable-build/
+*.zip
+*.log
+temp-*.js
+.netlify/
+.env
+.env.*

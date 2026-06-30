@@ -1,0 +1,10 @@
+{
+  "id": "wenxuecity",
+  "name": "Wenxuecity Blog",
+  "description": "Crawls Wenxuecity category listing pages and saves each article body.",
+  "articleLinkSelector": ".articleCell .atc_title a, .blog_title_h .blog_title a, .articleList .blog_title a, .articleList a[href*=\"/myblog/\"]",
+  "titleSelector": ".titleName",
+  "contentSelector": ".articalContent",
+  "commentsSelector": "#comments",
+  "nextPageSelector": ".paging"
+}

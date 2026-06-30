@@ -1,0 +1,21 @@
+[build]
+  command = "npm run build"
+  publish = "app/public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = [
+    "app/profiles/**",
+    "app/server/src/**"
+  ]
+
+[[redirects]]
+  from = "/api/download/*"
+  to = "/.netlify/functions/download/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200

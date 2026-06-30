@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blog Backup Tool README</title>
+  <style>
+    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; color: #202124; background: #f6f7f9; }
+    main { max-width: 880px; margin: 0 auto; padding: 32px 24px 48px; }
+    h1 { font-size: 32px; margin: 0 0 8px; }
+    h2 { margin-top: 28px; }
+    p, li { line-height: 1.55; }
+    code { background: #eceff3; border-radius: 4px; padding: 2px 5px; }
+    .panel { background: #fff; border: 1px solid #dfe3e8; border-radius: 8px; padding: 20px; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Blog Backup Tool</h1>
+    <p>This portable Windows folder contains everything needed to run the backup tool. No Node.js installation, browser setup, or terminal commands are required.</p>
+
+    <section class="panel">
+      <h2>Start</h2>
+      <ol>
+        <li>Right-click the downloaded ZIP and choose <strong>Extract All</strong>.</li>
+        <li>Open the extracted <strong>BlogBackup</strong> folder.</li>
+        <li>Double-click <strong>Start Backup.bat</strong>.</li>
+        <li>Your browser opens <code>http://localhost:3000</code>.</li>
+        <li>Paste a Wenxuecity blog home page URL.</li>
+        <li>Leave <strong>Incremental backup</strong> checked unless you want to re-save pages already archived.</li>
+        <li>Click <strong>Next</strong>.</li>
+        <li>Select the categories to archive.</li>
+        <li>Click <strong>Start Backup</strong>.</li>
+      </ol>
+      <p>Keep the small black server window open while using the tool. Close it when you are done.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Output</h2>
+      <p>The generated static archive is written to the <code>archive</code> folder. Open <code>archive\index.html</code> directly in a browser to view saved blogs and categories. Exported full-archive ZIP files are written to <code>exports</code>.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Profiles</h2>
+      <p>Profiles live in <code>app\profiles</code>. The app detects Wenxuecity blog URLs automatically. Other profiles are still available for future site support.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Portable ZIP</h2>
+      <p>For maintainers: run <code>tools\build-portable.ps1</code> to create <code>BlogBackup.zip</code>. The build script downloads a Windows Node.js runtime, installs app dependencies, installs Playwright Chromium, and prepares empty writable archive, export, and log folders.</p>
+    </section>
+  </main>
+</body>
+</html>
