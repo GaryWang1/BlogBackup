@@ -9,6 +9,12 @@
     "app/profiles/**",
     "app/server/src/**"
   ]
+  external_node_modules = [
+    "playwright",
+    "playwright-core",
+    "chromium-bidi",
+    "@sparticuz/chromium"
+  ]
 
 [[redirects]]
   from = "/api/download/*"
