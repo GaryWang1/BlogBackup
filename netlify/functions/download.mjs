@@ -1,8 +1,10 @@
 import path from 'node:path';
 import { Buffer } from 'node:buffer';
+import * as netlifyBlobsBundle from '@netlify/blobs';
 import jobs from '../lib/jobs.cjs';
 
 const { getJob, getZip } = jobs;
+void netlifyBlobsBundle;
 
 function json(status, body) {
   return Response.json(body, {

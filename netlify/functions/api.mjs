@@ -1,7 +1,11 @@
 import { Buffer } from 'node:buffer';
+import * as netlifyBlobsBundle from '@netlify/blobs';
+import * as cheerioBundle from 'cheerio';
 import apiHandler from '../lib/api-handler.cjs';
 
 const { handler } = apiHandler;
+void netlifyBlobsBundle;
+void cheerioBundle;
 const FUNCTION_BUNDLE_VERSION = 'cheerio-bundled-2026-06-30';
 
 function headersObject(headers) {
