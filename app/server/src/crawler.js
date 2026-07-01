@@ -36,8 +36,37 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isServerlessRuntime() {
+  return Boolean(process.env.NETLIFY || process.env.BLOG_BACKUP_SERVERLESS === '1');
+}
+
+async function fetchHtml(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const response = await fetch(url, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} for ${url}`);
+    }
+
+    return response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function launchBrowser() {
-  if (process.env.NETLIFY || process.env.BLOG_BACKUP_SERVERLESS === '1') {
+  if (isServerlessRuntime()) {
     const { chromium } = require('playwright-core');
     const chromiumPackage = require('@sparticuz/chromium');
     const chromiumBinary = chromiumPackage.default || chromiumPackage;
@@ -62,6 +91,22 @@ async function launchBrowser() {
   }
 
   return chromium.launch(launchOptions);
+}
+
+async function loadPageHtml(browser, url, progress, action = 'Rendering') {
+  if (!browser) {
+    progress(`${action === 'Rendering' ? 'Fetching' : action} ${url}`);
+    return fetchHtml(url);
+  }
+
+  const page = await browser.newPage();
+  try {
+    progress(`${action} ${url}`);
+    await gotoWithFallback(page, url, progress);
+    return await page.content();
+  } finally {
+    await page.close();
+  }
 }
 
 const MORE_BLOG_ARTICLES_MARKER = '\u66f4\u591a\u6211\u7684\u535a\u5ba2\u6587\u7ae0>>>';
@@ -420,43 +465,36 @@ async function backupDetailPage(browser, options) {
     progress
   } = options;
 
-  const page = await browser.newPage();
-  try {
-    progress(`Rendering ${sourceUrl}`);
-    await gotoWithFallback(page, sourceUrl, progress);
-    const html = await page.content();
-    const $ = cheerio.load(html, { decodeEntities: false });
-    const title = extractTitle($, profile.selectors.titleSelector);
-    const pageDir = detailPageDir(categoryArchive, title, sourceUrl);
-    const detailSourceCreatedAt = extractOptionalText($, profile.selectors.sourceCreatedAtSelector);
-    const articleHtml = extractContentHtml($, profile.selectors.contentSelector, sourceUrl);
-    const commentsHtml = includeComments ? extractCleanCommentsHtml($, profile.selectors.commentsSelector, sourceUrl) : '';
-    const contentHtml = commentsHtml ? `${articleHtml}\n${commentsHtml}` : articleHtml;
-    const contentDocument = cheerio.load(`<div id="archived-root">${contentHtml}</div>`, { decodeEntities: false });
+  const html = await loadPageHtml(browser, sourceUrl, progress);
+  const $ = cheerio.load(html, { decodeEntities: false });
+  const title = extractTitle($, profile.selectors.titleSelector);
+  const pageDir = detailPageDir(categoryArchive, title, sourceUrl);
+  const detailSourceCreatedAt = extractOptionalText($, profile.selectors.sourceCreatedAtSelector);
+  const articleHtml = extractContentHtml($, profile.selectors.contentSelector, sourceUrl);
+  const commentsHtml = includeComments ? extractCleanCommentsHtml($, profile.selectors.commentsSelector, sourceUrl) : '';
+  const contentHtml = commentsHtml ? `${articleHtml}\n${commentsHtml}` : articleHtml;
+  const contentDocument = cheerio.load(`<div id="archived-root">${contentHtml}</div>`, { decodeEntities: false });
 
-    const assets = await rewriteAssets(contentDocument, {
-      pageUrl: sourceUrl,
-      runAssetsDir: categoryArchive.assetsDir,
-      pageDir,
-      assetCache,
-      assetBudget,
-      progress
-    });
+  const assets = await rewriteAssets(contentDocument, {
+    pageUrl: sourceUrl,
+    runAssetsDir: categoryArchive.assetsDir,
+    pageDir,
+    assetCache,
+    assetBudget,
+    progress
+  });
 
-    const rewrittenHtml = contentDocument('#archived-root').html() || '';
+  const rewrittenHtml = contentDocument('#archived-root').html() || '';
 
-    return saveDetailPage(categoryArchive, {
-      sourceUrl,
-      sourceCreatedAt: detailSourceCreatedAt || sourceCreatedAt,
-      title,
-      html: rewrittenHtml,
-      capturedAt: new Date().toISOString(),
-      commentsArchived: Boolean(commentsHtml),
-      assets
-    });
-  } finally {
-    await page.close();
-  }
+  return saveDetailPage(categoryArchive, {
+    sourceUrl,
+    sourceCreatedAt: detailSourceCreatedAt || sourceCreatedAt,
+    title,
+    html: rewrittenHtml,
+    capturedAt: new Date().toISOString(),
+    commentsArchived: Boolean(commentsHtml),
+    assets
+  });
 }
 
 async function backupCategory(browser, options) {
@@ -471,7 +509,7 @@ async function backupCategory(browser, options) {
     progress
   } = options;
 
-  const page = await browser.newPage();
+  const page = browser ? await browser.newPage() : null;
   const seenCategoryUrls = new Set();
   const seenDetailUrls = new Set();
   const archivedUrls = new Set(categoryArchive.manifest.pages.map((entry) => normalizeSourceUrl(entry.sourceUrl)));
@@ -497,8 +535,12 @@ async function backupCategory(browser, options) {
       categoryPageCount += 1;
       progress(`[${categoryName}] Scanning index page ${categoryPageCount}: ${currentUrl}`);
 
-      await gotoWithFallback(page, currentUrl, progress);
-      const html = await page.content();
+      const html = page
+        ? await (async () => {
+          await gotoWithFallback(page, currentUrl, progress);
+          return page.content();
+        })()
+        : await fetchHtml(currentUrl);
       const $ = cheerio.load(html);
       const entries = extractArticleEntries($, profile.selectors.articleLinkSelector, currentUrl);
       let newLinksOnPage = 0;
@@ -551,7 +593,9 @@ async function backupCategory(browser, options) {
       currentUrl = extractNextPage($, profile.selectors.nextPageSelector, currentUrl);
     }
   } finally {
-    await page.close();
+    if (page) {
+      await page.close();
+    }
   }
 
   if (categoryPageCount >= categorySafetyLimit) {
@@ -644,7 +688,7 @@ async function runBackup(options) {
     progress
   } = options;
 
-  const browser = await launchBrowser();
+  const browser = isServerlessRuntime() ? null : await launchBrowser();
 
   const selectedCategories = Array.isArray(categories) ? categories : [];
   const limitsState = { pagesSaved: 0 };
@@ -705,7 +749,9 @@ async function runBackup(options) {
       failedCount: totalFailed
     };
   } finally {
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   }
 }
 
