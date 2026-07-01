@@ -6,9 +6,9 @@ const required = [
   'app/public/index.html',
   'app/public/app.js',
   'app/public/styles.css',
-  'netlify/functions/api.js',
-  'netlify/functions/archive-background.js',
-  'netlify/functions/download.js'
+  'netlify/functions/api.mjs',
+  'netlify/functions/archive-background.mjs',
+  'netlify/functions/download.mjs'
 ];
 
 for (const relativePath of required) {

@@ -9,7 +9,19 @@ const STORE_NAME = 'blog-backup-jobs';
 
 async function getStore() {
   const blobs = await import('@netlify/blobs');
-  return blobs.getStore(STORE_NAME);
+  const siteID = process.env.NETLIFY_BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token = process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN || process.env.NETLIFY_API_TOKEN;
+  const options = {
+    name: STORE_NAME,
+    consistency: 'strong'
+  };
+
+  if (siteID && token) {
+    options.siteID = siteID;
+    options.token = token;
+  }
+
+  return blobs.getStore(options);
 }
 
 function createJobId() {
