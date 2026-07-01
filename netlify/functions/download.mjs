@@ -1,9 +1,8 @@
 import path from 'node:path';
 import { Buffer } from 'node:buffer';
-import { createRequire } from 'node:module';
+import jobs from '../lib/jobs.cjs';
 
-const require = createRequire(import.meta.url);
-const { getJob, getZip } = require('../lib/jobs.cjs');
+const { getJob, getZip } = jobs;
 
 function json(status, body) {
   return Response.json(body, {

@@ -1,8 +1,7 @@
 import { Buffer } from 'node:buffer';
-import { createRequire } from 'node:module';
+import apiHandler from '../lib/api-handler.cjs';
 
-const require = createRequire(import.meta.url);
-const { handler } = require('../lib/api-handler.cjs');
+const { handler } = apiHandler;
 
 function headersObject(headers) {
   return Object.fromEntries(headers.entries());

@@ -1,7 +1,6 @@
-import { createRequire } from 'node:module';
+import archiveBackgroundHandler from '../lib/archive-background-handler.cjs';
 
-const require = createRequire(import.meta.url);
-const { handler } = require('../lib/archive-background-handler.cjs');
+const { handler } = archiveBackgroundHandler;
 
 export const config = {
   background: true
