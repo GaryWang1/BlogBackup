@@ -65,7 +65,7 @@ exports.handler = async (event) => {
     await queueSave();
 
     const payload = job.payload || {};
-    await runBackup({
+    const backupResult = await runBackup({
       profile: payload.profile,
       startUrl: payload.startUrl,
       blog: payload.blog,
@@ -82,6 +82,10 @@ exports.handler = async (event) => {
         queueSave();
       }
     });
+
+    if (backupResult.savedCount === 0 && backupResult.failedCount > 0) {
+      throw new Error(`Archive failed because all ${backupResult.failedCount} page${backupResult.failedCount === 1 ? '' : 's'} failed to save.`);
+    }
 
     const exported = await exportArchiveZip();
     const stat = await fs.stat(exported.path);
