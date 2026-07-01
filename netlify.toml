@@ -11,6 +11,9 @@
     "netlify/lib/**"
   ]
   external_node_modules = [
+    "@netlify/blobs",
+    "archiver",
+    "cheerio",
     "playwright",
     "playwright-core",
     "chromium-bidi",
