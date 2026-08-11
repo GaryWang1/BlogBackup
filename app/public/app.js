@@ -33,20 +33,28 @@ const progressLog = document.querySelector('#progress');
 const statusPill = document.querySelector('#status-pill');
 const usageToggle = document.querySelector('#usage-toggle');
 const usagePanel = document.querySelector('#usage-panel');
+const runtimeToggle = document.querySelector('#runtime-toggle');
 const runtimeNotice = document.querySelector('#runtime-notice');
 
-if (usageToggle && usagePanel) {
-  usageToggle.dataset.bound = 'true';
-  usageToggle.addEventListener('click', (event) => {
+function bindPanelToggle(toggle, panel) {
+  if (!toggle || !panel) {
+    return;
+  }
+
+  toggle.dataset.bound = 'true';
+  toggle.addEventListener('click', (event) => {
     event.preventDefault();
-    const shouldShow = usagePanel.hidden;
-    usagePanel.hidden = !shouldShow;
-    usageToggle.setAttribute('aria-expanded', String(shouldShow));
+    const shouldShow = panel.hidden;
+    panel.hidden = !shouldShow;
+    toggle.setAttribute('aria-expanded', String(shouldShow));
     if (shouldShow) {
-      usagePanel.scrollIntoView({ block: 'nearest' });
+      panel.scrollIntoView({ block: 'nearest' });
     }
   });
 }
+
+bindPanelToggle(usageToggle, usagePanel);
+bindPanelToggle(runtimeToggle, runtimeNotice);
 
 let activeJobId = null;
 let pollTimer = null;
@@ -732,7 +740,11 @@ function renderNetlifyRuntimeNotice(limits = {}) {
   appendRuntimeNoticeItem(list, 'Netlify 免费额度会同时计算下载流量、函数运行和部署等，用完后站点会暂停。');
 
   runtimeNotice.append(title, summary, list);
-  runtimeNotice.hidden = false;
+  runtimeNotice.hidden = true;
+  if (runtimeToggle) {
+    runtimeToggle.hidden = false;
+    runtimeToggle.setAttribute('aria-expanded', 'false');
+  }
 }
 
 async function initializeRuntimeMode() {
@@ -751,10 +763,7 @@ async function initializeRuntimeMode() {
 
     const archiveLink = document.querySelector('.masthead-actions a[href="/archive/index.html"]');
     if (archiveLink) {
-      archiveLink.href = '#progress';
-      archiveLink.removeAttribute('target');
-      archiveLink.textContent = 'ZIP';
-      archiveLink.title = '网页公开版会生成临时 ZIP；任务完成后请从状态区下载，解压后在本机离线阅读。';
+      archiveLink.hidden = true;
     }
     appendSystemLine('网页公开版会生成临时 ZIP 文件；下载并解压后可在本机离线阅读。');
   } catch {
