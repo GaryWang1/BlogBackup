@@ -253,16 +253,6 @@ function searchResultPageCount(totalCount, firstPageResultCount) {
   return Math.max(1, Math.ceil(totalCount / firstPageResultCount));
 }
 
-function extractSearchResultAuthor(selected, rowText) {
-  const strongAuthor = cleanText(selected.find('strong').first().text());
-  if (strongAuthor) {
-    return strongAuthor;
-  }
-
-  const match = cleanText(rowText).match(/\[[^\]]+\]\s*-\s*([^()]+?)(?=\s*\(\d+\s*bytes\b|\s+\d{4}-\d{2}-\d{2}|$)/i);
-  return match ? cleanText(match[1]) : '';
-}
-
 function additionalSearchPageUrls($, searchUrl, parsed, maxPages) {
   const pages = new Map();
   for (const pageUrl of searchPageUrls($, searchUrl)) {
@@ -331,7 +321,7 @@ function parseBbsSearchResults(html, { forumId, forumName, searchUrl }) {
       title: titleAnchor.text,
       sourceUrl: titleAnchor.href,
       sourceCreatedAt: cleanText(selected.find('i').last().text()) || '',
-      author: extractSearchResultAuthor(selected, rowText),
+      author: cleanText(selected.find('strong em').first().text()),
       forumId: ids.forumId,
       forumName: rowForum,
       isReply: rowText.includes('#跟帖#'),

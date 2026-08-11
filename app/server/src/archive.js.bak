@@ -1,5 +1,4 @@
 const archiver = require('archiver');
-const cheerio = require('cheerio');
 const crypto = require('crypto');
 const fs = require('fs');
 const fsp = require('fs/promises');
@@ -47,19 +46,6 @@ function normalizeSourceUrl(value) {
 
 function normalizeSourceCreatedAt(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
-}
-
-function hasOwn(object, key) {
-  return Object.prototype.hasOwnProperty.call(object || {}, key);
-}
-
-function htmlToSearchText(html) {
-  const $ = cheerio.load(String(html || ''), { decodeEntities: false });
-  $('script, style, noscript, iframe, object, embed, audio, video').remove();
-
-  const archivedContent = $('.archived-content').first();
-  const source = archivedContent.length ? archivedContent.text() : $.root().text();
-  return source.replace(/\s+/g, ' ').trim();
 }
 
 function displayBlogName(blog) {
@@ -219,8 +205,6 @@ function archiveCss() {
     .search-results { display: grid; gap: 12px; margin-top: 20px; }
     .search-results[hidden], .archive-list[hidden] { display: none; }
     .search-result h2 { font-size: 20px; }
-    .search-match { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; background: #e8f2fc; color: var(--accent); font-size: 13px; font-weight: 700; }
-    .search-snippet { margin: 10px 0 0; color: var(--ink); line-height: 1.55; }
     .list { display: grid; gap: 12px; margin-top: 20px; }
     .item { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
     .item h2, .item h3 { margin: 0 0 8px; }
@@ -375,49 +359,9 @@ async function buildArchiveSearchItems(blogs) {
           categoryName: String(categoryName),
           sourceUrl: String(page.sourceUrl || ''),
           sourceCreatedAt: normalizeSourceCreatedAt(page.sourceCreatedAt),
-          capturedAt: String(page.capturedAt || ''),
-          searchText: String(page.searchText || '')
+          capturedAt: String(page.capturedAt || '')
         });
       }
-    }
-  }
-
-  return sortPagesByCreatedDescending(items);
-}
-
-async function buildBlogSearchItems(blogSummary) {
-  const items = [];
-  const categories = Array.isArray(blogSummary.categories) ? blogSummary.categories : [];
-  const blogIndexDir = path.posix.dirname(blogSummary.archivePath || 'index.html');
-
-  for (const category of categories) {
-    if (!category.manifestPath) {
-      continue;
-    }
-
-    const manifest = await readJson(path.join(paths.archiveDir, category.manifestPath), null);
-    const pages = Array.isArray(manifest?.pages) ? manifest.pages : [];
-    const categoryArchivePath = category.archivePath || manifest?.category?.archivePath || '';
-    const categoryDir = categoryArchivePath ? path.posix.dirname(categoryArchivePath) : path.posix.dirname(category.manifestPath);
-    const categoryName = manifest?.category?.name || category.name || '';
-    const blogDisplay = displayBlogName({ ...blogSummary, ...(manifest?.blog || {}) });
-
-    for (const page of pages) {
-      if (!page?.title || !page?.path) {
-        continue;
-      }
-
-      const archiveHref = toUrlPath(path.posix.join(categoryDir, page.path));
-      items.push({
-        title: String(page.title),
-        href: toUrlPath(path.posix.relative(blogIndexDir, archiveHref)) || 'index.html',
-        blogName: blogDisplay,
-        categoryName: String(categoryName),
-        sourceUrl: String(page.sourceUrl || ''),
-        sourceCreatedAt: normalizeSourceCreatedAt(page.sourceCreatedAt),
-        capturedAt: String(page.capturedAt || ''),
-        searchText: String(page.searchText || '')
-      });
     }
   }
 
@@ -438,17 +382,8 @@ function buildCategorySearchItems(manifest) {
       categoryName: String(categoryName),
       sourceUrl: String(page.sourceUrl || ''),
       sourceCreatedAt: normalizeSourceCreatedAt(page.sourceCreatedAt),
-      capturedAt: String(page.capturedAt || ''),
-      searchText: String(page.searchText || '')
+      capturedAt: String(page.capturedAt || '')
     }));
-}
-
-function hasContentSearchItems(searchItems) {
-  return searchItems.some((item) => String(item.searchText || '').trim());
-}
-
-function archiveSearchPlaceholder(searchItems) {
-  return hasContentSearchItems(searchItems) ? '搜索标题或内容' : '搜索页面标题';
 }
 
 function archiveSearchScript(searchItems) {
@@ -472,9 +407,7 @@ function archiveSearchScript(searchItems) {
           pages = [];
         }
 
-        const hasContentSearch = pages.some((item) => String(item.searchText || '').trim());
         const normalize = (value) => String(value || '').toLocaleLowerCase();
-        const normalizeText = (value) => String(value || '').replace(/\s+/g, ' ').trim();
 
         function appendText(parent, className, text) {
           const element = document.createElement('p');
@@ -483,51 +416,16 @@ function archiveSearchScript(searchItems) {
           parent.appendChild(element);
         }
 
-        function appendMeta(meta, text, className = '') {
+        function appendMeta(meta, text) {
           if (!text) {
             return;
           }
           const span = document.createElement('span');
-          if (className) {
-            span.className = className;
-          }
           span.textContent = text;
           meta.appendChild(span);
         }
 
-        function snippetFor(text, query) {
-          const source = normalizeText(text);
-          if (!source) {
-            return '';
-          }
-
-          const index = normalize(source).indexOf(query);
-          if (index < 0) {
-            return '';
-          }
-
-          const radius = 54;
-          const start = Math.max(0, index - radius);
-          const end = Math.min(source.length, index + query.length + radius);
-          const prefix = start > 0 ? '...' : '';
-          const suffix = end < source.length ? '...' : '';
-          return prefix + source.slice(start, end) + suffix;
-        }
-
-        function matchItem(item, query) {
-          if (normalize(item.title).includes(query)) {
-            return { item, matchType: 'title', snippet: '' };
-          }
-
-          if (normalize(item.searchText).includes(query)) {
-            return { item, matchType: 'content', snippet: snippetFor(item.searchText, query) };
-          }
-
-          return null;
-        }
-
-        function renderResult(match) {
-          const item = match.item;
+        function renderResult(item) {
           const section = document.createElement('section');
           section.className = 'item search-result';
 
@@ -549,15 +447,10 @@ function archiveSearchScript(searchItems) {
 
           const meta = document.createElement('div');
           meta.className = 'meta';
-          appendMeta(meta, match.matchType === 'title' ? '标题匹配' : '内容匹配', 'search-match');
           appendMeta(meta, item.sourceCreatedAt ? '原文时间 ' + item.sourceCreatedAt : '');
           appendMeta(meta, item.capturedAt ? '归档 ' + new Date(item.capturedAt).toLocaleString() : '');
           if (meta.children.length) {
             section.appendChild(meta);
-          }
-
-          if (match.snippet) {
-            appendText(section, 'search-snippet', match.snippet);
           }
 
           return section;
@@ -574,18 +467,16 @@ function archiveSearchScript(searchItems) {
             return;
           }
 
-          const matches = pages
-            .map((item) => matchItem(item, query))
-            .filter(Boolean);
+          const matches = pages.filter((item) => normalize(item.title).includes(query));
           archiveList.hidden = true;
           results.hidden = false;
-          status.textContent = matches.length + (hasContentSearch ? ' 个标题/内容匹配' : ' 个标题匹配');
+          status.textContent = matches.length + ' 个标题匹配';
 
           if (!matches.length) {
             const empty = document.createElement('section');
             empty.className = 'item';
             const heading = document.createElement('h2');
-            heading.textContent = hasContentSearch ? '没有匹配的标题或内容' : '没有匹配的页面标题';
+            heading.textContent = '没有匹配的页面标题';
             empty.appendChild(heading);
             results.appendChild(empty);
             return;
@@ -612,7 +503,6 @@ async function renderArchiveIndex() {
       updatedAt: run.finishedAt || run.startedAt
     }));
   const searchItems = await buildArchiveSearchItems(blogs);
-  const searchPlaceholder = archiveSearchPlaceholder(searchItems);
   const items = [
     ...sortByUpdatedAtDescending(blogs).map(renderBlogArchiveCard),
     ...sortByUpdatedAtDescending(legacyRuns).map(renderLegacyRunCard)
@@ -624,9 +514,9 @@ async function renderArchiveIndex() {
         <h1>离线阅读归档</h1>
         <p class="muted">保存在本机的离线文章和论坛帖子。</p>
         <div class="search-panel" role="search">
-          <label class="sr-only" for="archive-search">${escapeHtml(searchPlaceholder)}</label>
+          <label class="sr-only" for="archive-search">搜索页面标题</label>
           <div class="search-field">
-            <input id="archive-search" type="search" placeholder="${escapeHtml(searchPlaceholder)}" autocomplete="off" spellcheck="false">
+            <input id="archive-search" type="search" placeholder="搜索页面标题" autocomplete="off" spellcheck="false">
           </div>
           <div id="archive-search-status" class="search-status" aria-live="polite"></div>
         </div>
@@ -645,8 +535,6 @@ async function renderArchiveIndex() {
 }
 
 async function renderBlogIndex(blogSummary) {
-  const searchItems = await buildBlogSearchItems(blogSummary);
-  const searchPlaceholder = archiveSearchPlaceholder(searchItems);
   const items = sortByUpdatedAtDescending(blogSummary.categories)
     .map((category) => `
       <section class="item">
@@ -670,22 +558,13 @@ async function renderBlogIndex(blogSummary) {
           <a class="button" href="../../index.html">归档首页</a>
           <a class="button" href="${escapeHtml(blogSummary.homeUrl)}">原博客</a>
         </div>
-        <div class="search-panel" role="search">
-          <label class="sr-only" for="archive-search">${escapeHtml(searchPlaceholder)}</label>
-          <div class="search-field">
-            <input id="archive-search" type="search" placeholder="${escapeHtml(searchPlaceholder)}" autocomplete="off" spellcheck="false">
-          </div>
-          <div id="archive-search-status" class="search-status" aria-live="polite"></div>
-        </div>
       </div>
     </header>
     <main class="wrap">
-      <div id="archive-search-results" class="search-results" hidden></div>
-      <div id="archive-list" class="list archive-list">
+      <div class="list">
         ${items || '<section class="item"><h2>还没有保存分类</h2></section>'}
       </div>
     </main>
-    ${archiveSearchScript(searchItems)}
   `;
 
   await fsp.mkdir(path.dirname(path.join(paths.archiveDir, blogSummary.archivePath)), { recursive: true });
@@ -695,7 +574,6 @@ async function renderBlogIndex(blogSummary) {
 async function renderCategoryPage(categoryArchive, manifest) {
   const blogIndexHref = toUrlPath(path.relative(categoryArchive.categoryRootDir, categoryArchive.blogIndexPath)) || '../index.html';
   const searchItems = buildCategorySearchItems(manifest);
-  const searchPlaceholder = archiveSearchPlaceholder(searchItems);
   const items = sortPagesByCreatedDescending(manifest.pages)
     .map((page) => `
       <section class="item">
@@ -720,9 +598,9 @@ async function renderCategoryPage(categoryArchive, manifest) {
           <a class="button" href="${escapeHtml(manifest.category.url)}">原分类</a>
         </div>
         <div class="search-panel" role="search">
-          <label class="sr-only" for="archive-search">${escapeHtml(searchPlaceholder)}</label>
+          <label class="sr-only" for="archive-search">搜索页面标题</label>
           <div class="search-field">
-            <input id="archive-search" type="search" placeholder="${escapeHtml(searchPlaceholder)}" autocomplete="off" spellcheck="false">
+            <input id="archive-search" type="search" placeholder="搜索页面标题" autocomplete="off" spellcheck="false">
           </div>
           <div id="archive-search-status" class="search-status" aria-live="polite"></div>
         </div>
@@ -806,67 +684,11 @@ async function syncCategoryArchive(categoryArchive, manifest) {
   await upsertBlogCategory(manifest);
 }
 
-async function backfillArchiveSearchText() {
-  const blogs = await readBlogs();
-  let changedAny = false;
-
-  for (const blog of blogs) {
-    const categories = Array.isArray(blog.categories) ? blog.categories : [];
-    for (const category of categories) {
-      if (!category.manifestPath) {
-        continue;
-      }
-
-      const manifestPath = path.join(paths.archiveDir, category.manifestPath);
-      const manifest = await readJson(manifestPath, null);
-      const pages = Array.isArray(manifest?.pages) ? manifest.pages : [];
-      if (!pages.length || !manifest?.category?.archivePath || !manifest?.blog?.archivePath) {
-        continue;
-      }
-
-      const categoryRootDir = path.dirname(manifestPath);
-      let changed = false;
-
-      for (const page of pages) {
-        if (!page || hasOwn(page, 'searchText') || !page.path) {
-          continue;
-        }
-
-        const detailPath = path.join(categoryRootDir, page.path);
-        try {
-          const html = await fsp.readFile(detailPath, 'utf8');
-          page.searchText = htmlToSearchText(html);
-        } catch {
-          page.searchText = '';
-        }
-        changed = true;
-      }
-
-      if (!changed) {
-        continue;
-      }
-
-      await writeJson(manifestPath, manifest);
-      await renderCategoryPage({
-        categoryRootDir,
-        categoryIndexPath: path.join(paths.archiveDir, manifest.category.archivePath),
-        blogIndexPath: path.join(paths.archiveDir, manifest.blog.archivePath)
-      }, manifest);
-      changedAny = true;
-    }
-  }
-
-  return changedAny;
-}
-
 async function ensureArchiveBase() {
   await paths.ensureDirs();
   if (!fs.existsSync(BLOGS_FILE)) {
     await writeBlogs([]);
   }
-  await backfillArchiveSearchText();
-  await renderAllCategoryIndexes();
-  await renderAllBlogIndexes();
   await renderArchiveIndex();
 }
 
@@ -994,8 +816,7 @@ async function saveDetailPage(categoryArchive, detail) {
     commentsArchived: Boolean(detail.commentsArchived),
     path: toUrlPath(path.relative(categoryArchive.categoryRootDir, path.join(pageDir, 'index.html'))),
     metadataPath: toUrlPath(path.relative(categoryArchive.categoryRootDir, path.join(pageDir, 'metadata.json'))),
-    assets: metadata.assets,
-    searchText: htmlToSearchText(detail.html)
+    assets: metadata.assets
   };
 
   const normalizedDetailUrl = normalizeSourceUrl(detail.sourceUrl);

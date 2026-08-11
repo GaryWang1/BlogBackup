@@ -33,7 +33,6 @@ const progressLog = document.querySelector('#progress');
 const statusPill = document.querySelector('#status-pill');
 const usageToggle = document.querySelector('#usage-toggle');
 const usagePanel = document.querySelector('#usage-panel');
-const runtimeNotice = document.querySelector('#runtime-notice');
 
 if (usageToggle && usagePanel) {
   usageToggle.dataset.bound = 'true';
@@ -141,17 +140,6 @@ function selectedBbsResults() {
       .map((input) => input.value)
   );
   return bbsSearchState.results.filter((result) => selectedUrls.has(result.sourceUrl));
-}
-
-function bbsResultUserId(result) {
-  const author = String(result?.author || '').trim();
-  if (author) {
-    return author;
-  }
-
-  const summary = String(result?.summary || '').replace(/\s+/g, ' ').trim();
-  const match = summary.match(/\[[^\]]+\]\s*-\s*([^()]+?)(?=\s*\(\d+\s*bytes\b|\s+\d{4}-\d{2}-\d{2}|$)/i);
-  return match ? match[1].trim() : '';
 }
 
 function updateStartState() {
@@ -592,26 +580,20 @@ bbsCollectionButton.addEventListener('click', () => {
 
     const meta = document.createElement('span');
     meta.className = 'bbs-collection-meta';
-    const forumText = result.forumName ? `[${result.forumName}]` : '';
-    const userId = bbsResultUserId(result);
-    if (forumText) {
-      meta.append(document.createTextNode(forumText));
+    const parts = [];
+    if (result.forumName) {
+      parts.push(`[${result.forumName}]`);
     }
-    if (userId) {
-      if (meta.childNodes.length) {
-        meta.append(document.createTextNode(' - '));
-      }
-      const userIdText = document.createElement('strong');
-      userIdText.className = 'bbs-user-id';
-      userIdText.textContent = userId;
-      meta.append(userIdText);
+    if (result.author) {
+      parts.push(result.author);
+    }
+    if (Number.isFinite(result.bytes)) {
+      parts.push(`(${result.bytes} bytes)`);
     }
     if (result.sourceCreatedAt) {
-      if (meta.childNodes.length) {
-        meta.append(document.createTextNode(' | '));
-      }
-      meta.append(document.createTextNode(result.sourceCreatedAt));
+      parts.push(result.sourceCreatedAt);
     }
+    meta.textContent = parts.join(' ');
 
     item.append(bulletSpan, titleLink, document.createTextNode(' '), meta);
     list.appendChild(item);
@@ -691,50 +673,6 @@ if (exportZipButton) {
 setStatus('idle');
 appendSystemLine('准备就绪。');
 
-function formatLimitBytes(value) {
-  const bytes = Number(value);
-  if (!Number.isFinite(bytes) || bytes <= 0) {
-    return '未限制';
-  }
-
-  return `${(bytes / 1024 / 1024).toFixed(0)} MB`;
-}
-
-function formatLimitCount(value, fallback) {
-  const count = Number(value);
-  return Number.isFinite(count) && count > 0 ? count : fallback;
-}
-
-function appendRuntimeNoticeItem(list, text) {
-  const item = document.createElement('li');
-  item.textContent = text;
-  list.appendChild(item);
-}
-
-function renderNetlifyRuntimeNotice(limits = {}) {
-  if (!runtimeNotice) {
-    return;
-  }
-
-  runtimeNotice.replaceChildren();
-
-  const title = document.createElement('h2');
-  title.textContent = '网页公开版限制';
-
-  const summary = document.createElement('p');
-  summary.textContent = '网页公开版适合小批量试用，会生成临时 ZIP 下载文件；下载后请解压到本机离线阅读。大量备份建议使用桌面版。';
-
-  const list = document.createElement('ul');
-  appendRuntimeNoticeItem(list, '支持来源：文学城博客和文学城论坛。');
-  appendRuntimeNoticeItem(list, `每次最多选择 ${formatLimitCount(limits.maxSelectedCategories, 3)} 个博客分类，或 ${formatLimitCount(limits.maxSelectedBbsPosts, 80)} 个论坛帖子。`);
-  appendRuntimeNoticeItem(list, `每次任务最多保存 ${formatLimitCount(limits.maxPagesPerJob, 80)} 个页面；每个分类最多读取 ${formatLimitCount(limits.maxCategoryIndexPages, 12)} 个目录页。`);
-  appendRuntimeNoticeItem(list, `资源预算约 ${formatLimitBytes(limits.maxAssetBytes)}，ZIP 下载上限约 ${formatLimitBytes(limits.maxZipBytes)}。`);
-  appendRuntimeNoticeItem(list, 'Netlify 免费额度会同时计算下载流量、函数运行和部署等，用完后站点会暂停。');
-
-  runtimeNotice.append(title, summary, list);
-  runtimeNotice.hidden = false;
-}
-
 async function initializeRuntimeMode() {
   try {
     const response = await fetch('/api/health', { cache: 'no-store' });
@@ -747,16 +685,14 @@ async function initializeRuntimeMode() {
       return;
     }
 
-    renderNetlifyRuntimeNotice(health.limits || {});
-
     const archiveLink = document.querySelector('.masthead-actions a[href="/archive/index.html"]');
     if (archiveLink) {
       archiveLink.href = '#progress';
       archiveLink.removeAttribute('target');
       archiveLink.textContent = 'ZIP';
-      archiveLink.title = '网页公开版会生成临时 ZIP；任务完成后请从状态区下载，解压后在本机离线阅读。';
+      archiveLink.title = '归档完成后，这里会出现临时 ZIP 下载链接。';
     }
-    appendSystemLine('网页公开版会生成临时 ZIP 文件；下载并解压后可在本机离线阅读。');
+    appendSystemLine('网页版会生成临时 ZIP 文件；下载后可在本机离线阅读。');
   } catch {
     // The portable local server may not expose cloud runtime details.
   }

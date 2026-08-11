@@ -20,8 +20,6 @@
         </div>
       </div>
 
-      <section id="runtime-notice" class="runtime-notice" aria-live="polite" hidden></section>
-
       <section id="usage-panel" class="usage-panel" hidden>
         <h2>如何使用</h2>
         <ol>
@@ -31,8 +29,7 @@
           <li><strong>制作合集。</strong>选择“论坛”，点击“下一步”，选择论坛版块；然后用“关键词”按标题查找。选中结果后点击“做合集”。</li>
 		  <li><strong>增量下载。</strong>默认只下载新增文章或帖子；如果想重新下载保存已归档内容，取消“增量下载”。</li>
           <li><strong>跟帖保存。</strong>勾选“包含跟帖”后，文章页面会尽量保存评论、跟帖和相关资源。</li>
-          <li><strong>离线阅读。</strong>下载完成后点击右上角“阅读”，进入归档首页；也可以在归档页、博客页和分类页用搜索框按页面标题或正文内容查找已保存内容。</li>
-          <li><strong>网页版本。</strong>网页公开版会生成临时 ZIP 下载文件。下载后请先解压，再从本机打开归档阅读；如果要保存大量内容，建议使用桌面版。</li>
+          <li><strong>离线阅读。</strong>下载完成后点击右上角“阅读”，进入归档首页；也可以在归档页和分类页用搜索框按页面标题查找已保存内容。</li>
         </ol>
       </section>
 
