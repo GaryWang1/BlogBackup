@@ -502,3 +502,15 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+[hidden] {
+  display: none !important;
+}
+
+#download-options {
+  margin: 16px 0;
+}
+
+#download-options .check-row + .check-row {
+  margin-top: 10px;
+}

@@ -3,7 +3,7 @@ const startUrlInput = document.querySelector('#start-url');
 const sourceTypeRadios = document.querySelectorAll('input[name="source-type"]');
 const incrementalInput = document.querySelector('#incremental');
 const includeCommentsInput = document.querySelector('#include-comments');
-const includeCommentsRow = document.querySelector('#include-comments-row');
+const downloadOptions = document.querySelector('#download-options');
 const nextButton = document.querySelector('#next-button');
 const categoryPanel = document.querySelector('#category-panel');
 const categoryMode = document.querySelector('#category-mode');
@@ -59,6 +59,7 @@ bindPanelToggle(runtimeToggle, runtimeNotice);
 let activeJobId = null;
 let pollTimer = null;
 let inspection = null;
+let inspectionRequestId = 0;
 let sourceMode = 'blog';
 let bbsSearchState = null;
 let lastDownloadUrl = null;
@@ -163,6 +164,11 @@ function bbsResultUserId(result) {
 }
 
 function updateStartState() {
+  const downloadButton = sourceMode === 'blog' ? startButton : bbsStartButton;
+  downloadOptions.hidden = categoryPanel.hidden || downloadButton.hidden;
+  if (!downloadOptions.hidden) {
+    downloadButton.before(downloadOptions);
+  }
   startButton.disabled = sourceMode !== 'blog' || !inspection || selectedCategories().length === 0 || Boolean(activeJobId);
   bbsStartButton.disabled = sourceMode !== 'bbs' || selectedBbsResults().length === 0 || Boolean(activeJobId);
   bbsCollectionButton.disabled = sourceMode !== 'bbs' || selectedBbsResults().length === 0 || Boolean(activeJobId);
@@ -188,7 +194,6 @@ function renderCategories(data) {
   categoryList.textContent = '';
   categoryMode.hidden = false;
   bbsMode.hidden = true;
-  includeCommentsRow.hidden = false;
 
   for (const category of data.categories) {
     const item = document.createElement('label');
@@ -227,7 +232,6 @@ function renderBbsSetup(data) {
   sourceMode = 'bbs';
   categoryMode.hidden = true;
   bbsMode.hidden = false;
-  includeCommentsRow.hidden = true;
   bbsTitle.textContent = data.blog.name;
   bbsProfileName.textContent = data.profile.name;
   bbsForum.textContent = '';
@@ -244,6 +248,7 @@ function renderBbsSetup(data) {
 
   bbsForum.value = data.defaultForumId || 'romance';
   clearBbsResults();
+  updateBbsKeywordLabel();
   categoryPanel.hidden = false;
 }
 
@@ -423,15 +428,16 @@ async function startArchive(categories, includeComments) {
   }
 }
 
-inspectForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
+async function inspectSource() {
+  const requestId = ++inspectionRequestId;
+  const sourceType = currentSourceType();
   const startUrl = startUrlInput.value.trim();
   nextButton.disabled = true;
   categoryPanel.hidden = true;
+  downloadOptions.hidden = true;
   categoryMode.hidden = true;
   bbsMode.hidden = true;
   startButton.hidden = true;
-  includeCommentsRow.hidden = false;
   inspection = null;
   bbsSearchState = null;
   progressLog.textContent = '';
@@ -442,9 +448,10 @@ inspectForm.addEventListener('submit', async (event) => {
     const response = await fetch('/api/inspect', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ startUrl, sourceType: currentSourceType() })
+      body: JSON.stringify({ startUrl, sourceType })
     });
     const data = await response.json();
+    if (requestId !== inspectionRequestId) return;
     if (!response.ok) {
       throw new Error(data.error || '无法识别这个来源。');
     }
@@ -458,11 +465,17 @@ inspectForm.addEventListener('submit', async (event) => {
       renderCategories(data);
     }
   } catch (error) {
+    if (requestId !== inspectionRequestId) return;
     setStatus('failed');
     appendSystemLine(error.message);
   } finally {
-    nextButton.disabled = false;
+    if (requestId === inspectionRequestId) nextButton.disabled = false;
   }
+}
+
+inspectForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  inspectSource();
 });
 
 selectAllButton.addEventListener('click', () => {
@@ -564,7 +577,7 @@ bbsStartButton.addEventListener('click', () => {
     return;
   }
 
-  startArchive([bbsCategoryFromSelection()], true);
+  startArchive([bbsCategoryFromSelection()], includeCommentsInput.checked);
 });
 
 bbsCollectionButton.addEventListener('click', () => {
@@ -776,6 +789,7 @@ initializeRuntimeMode();
 // Initialize source type UI behavior
 function updateSourceTypeUI() {
   const type = currentSourceType();
+  nextButton.parentElement.hidden = type === 'bbs';
   const urlLabel = document.querySelector('#start-url-label');
   const urlInput = document.querySelector('#start-url');
   urlInput.dataset.originalPlaceholder = urlInput.dataset.originalPlaceholder || urlInput.placeholder || BLOG_URL_PLACEHOLDER;
@@ -784,13 +798,11 @@ function updateSourceTypeUI() {
     urlLabel.hidden = true;
     urlInput.value = BBS_HOME_URL;
     urlInput.removeAttribute('required');
-    includeCommentsRow.hidden = true;
   } else {
     urlLabel.hidden = false;
     urlInput.value = '';
     urlInput.placeholder = urlInput.dataset.originalPlaceholder || BLOG_URL_PLACEHOLDER;
     urlInput.setAttribute('required', '');
-    includeCommentsRow.hidden = false;
   }
 }
 
@@ -810,13 +822,18 @@ function updateBbsKeywordLabel() {
 
 sourceTypeRadios.forEach((radio) => {
   radio.addEventListener('change', () => {
+    ++inspectionRequestId;
+    nextButton.disabled = Boolean(activeJobId);
     updateSourceTypeUI();
     categoryPanel.hidden = true;
     categoryMode.hidden = true;
     bbsMode.hidden = true;
     startButton.hidden = true;
     inspection = null;
-    bbsSearchState = null;
+    sourceMode = currentSourceType();
+    clearBbsResults();
+    if (sourceMode === 'bbs') inspectSource();
+    else if (!activeJobId) setStatus('idle');
   });
 });
 

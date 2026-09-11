@@ -28,8 +28,8 @@
         <ol>
           <li><strong>选择来源。</strong>选择“博客”可备份文学城博客分类；选择“论坛”可按文学城 ID 或关键词查找论坛帖子。</li>
           <li><strong>博客备份。</strong>粘贴博主博客首页网址，例如 <code>https://blog.wenxuecity.com/myoverview/41038/</code>，点击“下一步”，勾选要保存的分类，再点击“开始下载”。</li>
-          <li><strong>论坛备份。</strong>选择“论坛”，点击“下一步”，选择论坛版块；然后用“文学城ID”按作者查找。挑选打算下载的帖子，选中结果后可以“开始下载”。</li>
-          <li><strong>制作合集。</strong>选择“论坛”，点击“下一步”，选择论坛版块；然后用“关键词”按标题查找。选中结果后点击“做合集”。</li>
+          <li><strong>论坛备份。</strong>选择“论坛”后直接选择论坛版块；然后用“文学城ID”按作者查找。挑选打算下载的帖子，选中结果后可以“开始下载”。</li>
+          <li><strong>制作合集。</strong>选择“论坛”后直接选择论坛版块；然后用“关键词”按标题查找。选中结果后点击“做合集”。</li>
 		  <li><strong>增量下载。</strong>默认只下载新增文章或帖子；如果想重新下载保存已归档内容，取消“增量下载”。</li>
           <li><strong>跟帖保存。</strong>勾选“包含跟帖”后，文章页面会尽量保存评论、跟帖和相关资源。</li>
           <li><strong>离线阅读。</strong>下载完成后点击右上角“阅读”，进入归档首页；也可以在归档页、博客页和分类页用搜索框按页面标题或正文内容查找已保存内容。</li>
@@ -51,18 +51,8 @@
 
         </div>
         <label id="start-url-label">
-          <span>博客首页网址（论坛不用输入网址，点击“下一步”，然后选择论坛）</span> 
+          <span>博客首页网址</span>
           <input id="start-url" name="startUrl" type="url" placeholder="https://blog.wenxuecity.com/myoverview/41038/" required>
-        </label>
-
-        <label class="check-row">
-          <input id="incremental" name="incremental" type="checkbox" checked>
-          <span>增量下载(仅下载新文章), 不选则重新下载</span>
-        </label>
-
-        <label id="include-comments-row" class="check-row">
-          <input id="include-comments" name="includeComments" type="checkbox">
-          <span>包含跟帖</span>
         </label>
 
         <div class="actions">
@@ -85,6 +75,18 @@
             </div>
           </div>
           <div id="category-list" class="category-list"></div>
+          <div id="download-options" hidden>
+        <label class="check-row">
+          <input id="incremental" name="incremental" type="checkbox" checked>
+          <span>增量下载(仅下载新文章), 不选则重新下载</span>
+        </label>
+
+        <label id="include-comments-row" class="check-row">
+          <input id="include-comments" name="includeComments" type="checkbox">
+          <span>包含跟帖</span>
+        </label>
+
+          </div>
           <button id="start-button" type="button" hidden>开始下载</button>
         </div>
 
@@ -146,6 +148,6 @@
     </section>
   </main>
 
-  <script src="/app.js?v=runtime-toggle-1"></script>
+  <script src="/app.js?v=download-flow-2"></script>
 </body>
 </html>
