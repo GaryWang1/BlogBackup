@@ -683,17 +683,10 @@ function resetRecommendDraft() {
   recommendCopyStatus.textContent = '';
 }
 
-function syncRecommendLetter(force = false) {
+function syncRecommendLetter() {
   if (!recommendDraft || !recommendDate.value) return;
-  if (recommendDraft.manualLetter && !force) {
-    document.querySelector('#recommend-refresh-letter').hidden = false;
-    recommendCopyStatus.textContent = '已保留你对整封信的修改；如需套用上方条目的更改，请点击重新生成整封信。';
-    return;
-  }
-  recommendDraft.manualLetter = false;
   recommendLetter.value = RecommendTemplate.formatLetter({ date: recommendDate.value, forum: recommendDraft.forum, posts: recommendDraft.posts });
   document.querySelector('#recommend-letter-preview').innerHTML = RecommendTemplate.letterHtml(recommendLetter.value);
-  document.querySelector('#recommend-refresh-letter').hidden = true;
   recommendCopyStatus.textContent = '';
 }
 
@@ -795,32 +788,25 @@ bbsRecommendButton.addEventListener('click', () => {
   bbsRecommendOutput.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 });
 recommendDate.addEventListener('change', () => syncRecommendLetter());
-recommendLetter.addEventListener('input', () => {
-  document.querySelector('#recommend-letter-preview').innerHTML = RecommendTemplate.letterHtml(recommendLetter.value);
-  if (recommendDraft) recommendDraft.manualLetter = true;
-  recommendCopyStatus.textContent = '';
-});
-document.querySelector('#recommend-refresh-letter').addEventListener('click', () => syncRecommendLetter(true));
 document.querySelector('#recommend-copy').addEventListener('click', async () => {
   if (!recommendLetter.value) return;
   try {
     if (window.ClipboardItem && navigator.clipboard.write) {
-      try {
         await navigator.clipboard.write([new ClipboardItem({
           'text/plain': new Blob([recommendLetter.value], { type: 'text/plain' }),
           'text/html': new Blob([RecommendTemplate.letterHtml(recommendLetter.value)], { type: 'text/html' })
         })]);
-      } catch {
-        await navigator.clipboard.writeText(recommendLetter.value);
-      }
     } else {
-      await navigator.clipboard.writeText(recommendLetter.value);
+      throw new Error('Rich clipboard unavailable');
     }
-    recommendCopyStatus.textContent = '推荐信已复制，可粘贴给网管。';
+    recommendCopyStatus.textContent = '推荐信已复制（含超链接），请粘贴到支持富文本的编辑器。';
   } catch {
-    recommendLetter.focus();
-    recommendLetter.select();
-    recommendCopyStatus.textContent = '自动复制不可用，已选中推荐信，请按 Ctrl+C 或长按复制。';
+    const range = document.createRange();
+    range.selectNodeContents(document.querySelector('#recommend-letter-preview'));
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    recommendCopyStatus.textContent = '自动复制不可用，已选中带链接的推荐信，请按 Ctrl+C 或长按复制，并粘贴到支持富文本的编辑器。';
   }
 });
 

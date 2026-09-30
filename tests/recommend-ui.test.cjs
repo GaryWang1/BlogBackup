@@ -87,10 +87,10 @@ test('no search term required; all pages load; select 1–5; generate, edit and 
   let letter = await page.locator('#recommend-letter').inputValue();
   assert.match(letter, /9月26日的星坛优秀作品推荐/);
   assert.match(letter, /1，手动修改的推荐原因/);
-  await page.locator('#recommend-letter').fill(letter + '\n我的备注');
+  assert.equal(await page.locator('#recommend-letter').isVisible(), false);
   await page.locator('#recommend-reasons textarea').first().fill('稍后修改的原因');
-  assert.ok((await page.locator('#recommend-letter').inputValue()).endsWith('我的备注'));
-  assert.equal(await page.locator('#recommend-refresh-letter').isVisible(), true);
+  letter = await page.locator('#recommend-letter').inputValue();
+  assert.match(letter, /稍后修改的原因/);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.locator('#recommend-copy').click();
   await page.waitForFunction(() => document.querySelector('#recommend-copy-status').textContent.includes('已复制'));
@@ -100,7 +100,7 @@ test('no search term required; all pages load; select 1–5; generate, edit and 
     return (await items[0].getType('text/html')).text();
   });
   assert.match(copiedHtml, /href="https:\/\/bbs\.wenxuecity\.com\/romance\/1\.html"/);
-  assert.equal((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n'), letter + '\n我的备注');
+  assert.equal((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n'), letter);
   await fs.mkdir(path.join(__dirname, '../logs'), { recursive: true });
   await page.screenshot({ path: path.join(__dirname, '../logs/recommend-desktop.png'), fullPage: true });
 });
