@@ -23,6 +23,7 @@ configureRuntime();
 const { listProfiles, getProfile, getProfileForUrl } = require('../../app/server/src/profiles');
 const { inspectBlog } = require('../../app/server/src/blog-inspector');
 const { searchBbs } = require('../../app/server/src/bbs-inspector');
+const { searchRecentBbs, recommendBbs, validateSelection } = require('../../app/server/src/bbs-recommend');
 
 function routeFromEvent(event) {
   const rawPath = event.path || '/';
@@ -155,6 +156,9 @@ async function handleInspect(event) {
 
 async function handleBbsSearch(event) {
   const body = readBody(event);
+  if (body.searchMode === 'recommend') {
+    return json(200, await searchRecentBbs(body));
+  }
   const result = await searchBbs({
     forumId: body.forumId,
     forumName: body.forumName,
@@ -272,6 +276,12 @@ async function handler(event) {
     }
     if (event.httpMethod === 'POST' && route === '/api/bbs/search') {
       return await handleBbsSearch(event);
+    }
+    if (event.httpMethod === 'POST' && route === '/api/bbs/recommend') {
+      const body = readBody(event);
+      validateSelection(body);
+      await checkRateLimit(`recommend:${clientIp(event)}`);
+      return json(200, await recommendBbs(body));
     }
     if (event.httpMethod === 'POST' && route === '/api/start') {
       return await handleStart(event);

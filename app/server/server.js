@@ -8,6 +8,7 @@ const paths = require('./src/paths');
 const { listProfiles, getProfile, getProfileForUrl } = require('./src/profiles');
 const { inspectBlog } = require('./src/blog-inspector');
 const { searchBbs } = require('./src/bbs-inspector');
+const { searchRecentBbs, recommendBbs, validateSelection, checkLocalRecommendRate } = require('./src/bbs-recommend');
 const { ensureArchiveBase, exportArchiveZip } = require('./src/archive');
 const { createJobStore } = require('./src/jobs');
 
@@ -170,6 +171,9 @@ app.post('/api/inspect', async (req, res) => {
 
 app.post('/api/bbs/search', async (req, res) => {
   try {
+    if (req.body.searchMode === 'recommend') {
+      return res.json(await searchRecentBbs(req.body));
+    }
     const result = await searchBbs({
       forumId: req.body.forumId,
       forumName: req.body.forumName,
@@ -179,6 +183,16 @@ app.post('/api/bbs/search', async (req, res) => {
     res.json(result);
   } catch (error) {
     log(`BBS search failed: ${error.stack || error.message}`);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/bbs/recommend', async (req, res) => {
+  try {
+    validateSelection(req.body);
+    checkLocalRecommendRate(req.ip);
+    res.json(await recommendBbs(req.body));
+  } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
@@ -271,6 +285,7 @@ async function startServer() {
   const httpServer = app.listen(port, '127.0.0.1', () => {
     const url = `http://localhost:${port}`;
     log(`Blog Backup Tool listening on ${url}`);
+    log(`Gemini API key: ${process.env.GEMINI_API_KEY?.trim() ? 'configured' : 'not configured'}; model selection: ${process.env.GEMINI_MODEL?.trim() && process.env.GEMINI_MODEL !== 'auto' ? 'explicit GEMINI_MODEL' : 'auto (available free-tier text models)'}.`);
     if (process.env.BLOG_BACKUP_NO_OPEN !== '1') {
       openBrowser(url);
     }
@@ -282,6 +297,7 @@ async function startServer() {
       const health = await readExistingHealth(url);
       if (isThisBlogBackupInstance(health)) {
         log(`Blog Backup Tool is already running at ${url}`);
+        console.log('The running server keeps its old environment. To apply a new Gemini key/model, press Ctrl+C in the original server window, then run node server.js again in this window.');
         if (process.env.BLOG_BACKUP_NO_OPEN !== '1') {
           openBrowser(url);
         }

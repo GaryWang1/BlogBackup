@@ -288,6 +288,39 @@ button:disabled {
   border-color: var(--accent);
 }
 
+.radio-row.bbs-search-modes {
+  grid-template-columns: 1.25fr 1fr 0.9fr;
+  gap: 7px;
+}
+
+.bbs-search-modes .choice-row { padding: 8px 6px; gap: 5px; }
+.choice-row input { flex-shrink: 0; }
+
+#bbs-recommend-button {
+  width: 100%;
+  margin-top: 12px;
+  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+#bbs-recommend-button:disabled { color: #8a94a0; background: #f2f4f7; border-color: var(--line); }
+.recommend-output { padding: 20px; display: grid; gap: 16px; border-bottom: 1px solid var(--line); }
+.recommend-output textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  font: inherit;
+  font-weight: 400;
+  color: var(--ink);
+  line-height: 1.65;
+}
+.recommend-output textarea:focus { outline: 2px solid var(--focus); }
+.recommend-error { color: var(--danger); font-size: 13px; margin: 0; }
+.recommend-reason { display: grid; gap: 7px; }
+.recommend-reason a { color: var(--accent); overflow-wrap: anywhere; }
+
 #next-button:hover,
 #start-button:hover,
 #bbs-search-button:hover,
@@ -398,6 +431,7 @@ button:disabled {
 .result-list {
   max-height: 420px;
 }
+.search-window { margin: 0 0 12px; line-height: 1.6; }
 
 .result-option a {
   color: var(--accent);

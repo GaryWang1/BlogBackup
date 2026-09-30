@@ -21,12 +21,20 @@ const bbsKeyword = document.querySelector('#bbs-keyword');
 const bbsSearchButton = document.querySelector('#bbs-search-button');
 const bbsResultsPanel = document.querySelector('#bbs-results-panel');
 const bbsSearchSummary = document.querySelector('#bbs-search-summary');
+const bbsSearchWindow = document.querySelector('#bbs-search-window');
 const bbsResultsList = document.querySelector('#bbs-results-list');
 const bbsSelectAllButton = document.querySelector('#bbs-select-all');
 const bbsSelectNoneButton = document.querySelector('#bbs-select-none');
 const bbsStartButton = document.querySelector('#bbs-start-button');
 const bbsCollectionButton = document.querySelector('#bbs-collection-button');
 const bbsCollectionOutput = document.querySelector('#bbs-collection-output');
+const bbsRecommendButton = document.querySelector('#bbs-recommend-button');
+const bbsRecommendOutput = document.querySelector('#bbs-recommend-output');
+const bbsSelectedCount = document.querySelector('#bbs-selected-count');
+const recommendDate = document.querySelector('#recommend-date');
+const recommendReasons = document.querySelector('#recommend-reasons');
+const recommendLetter = document.querySelector('#recommend-letter');
+const recommendCopyStatus = document.querySelector('#recommend-copy-status');
 const openArchiveButton = document.querySelector('#open-archive');
 const exportZipButton = document.querySelector('#export-zip');
 const progressLog = document.querySelector('#progress');
@@ -63,6 +71,11 @@ let inspectionRequestId = 0;
 let sourceMode = 'blog';
 let bbsSearchState = null;
 let lastDownloadUrl = null;
+let bbsRequestId = 0;
+let bbsAbortController = null;
+let recommendRequestId = 0;
+let recommendBusy = false;
+let recommendDraft = null;
 const BBS_HOME_URL = 'https://bbs.wenxuecity.com/';
 const BLOG_URL_PLACEHOLDER = 'https://blog.wenxuecity.com/myoverview/41038/';
 
@@ -172,17 +185,35 @@ function updateStartState() {
   startButton.disabled = sourceMode !== 'blog' || !inspection || selectedCategories().length === 0 || Boolean(activeJobId);
   bbsStartButton.disabled = sourceMode !== 'bbs' || selectedBbsResults().length === 0 || Boolean(activeJobId);
   bbsCollectionButton.disabled = sourceMode !== 'bbs' || selectedBbsResults().length === 0 || Boolean(activeJobId);
+  const count = selectedBbsResults().length;
+  const recommending = bbsSearchState?.searchMode === 'recommend';
+  bbsRecommendButton.disabled = !recommending || count < 1 || count > 5 || recommendBusy || Boolean(activeJobId);
+  bbsSelectedCount.hidden = !recommending;
+  bbsSelectedCount.textContent = `已选 ${count}/5 篇`;
+  bbsSelectAllButton.hidden = recommending;
+  bbsResultsList.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+    checkbox.disabled = recommending && (recommendBusy || (count >= 5 && !checkbox.checked));
+  });
 }
 
 function clearBbsResults() {
+  ++bbsRequestId;
+  bbsAbortController?.abort();
+  bbsAbortController = null;
+  bbsSearchButton.disabled = false;
+  resetRecommendDraft();
   bbsSearchState = null;
   bbsSearchSummary.textContent = '';
+  bbsSearchWindow.textContent = '';
+  bbsSearchWindow.hidden = true;
   bbsResultsList.textContent = '';
   bbsResultsPanel.hidden = true;
   bbsStartButton.hidden = true;
   bbsCollectionButton.hidden = true;
+  bbsRecommendButton.hidden = true;
   bbsCollectionOutput.hidden = true;
   bbsCollectionOutput.textContent = '';
+  if (!activeJobId) setStatus('idle');
   updateStartState();
 }
 
@@ -266,7 +297,7 @@ function selectedForum() {
 }
 
 function currentBbsSearchMode() {
-  return document.querySelector('input[name="bbs-search-mode"]:checked')?.value === 'title' ? 'title' : 'author';
+  return document.querySelector('input[name="bbs-search-mode"]:checked')?.value || 'author';
 }
 
 function renderBbsResults(data) {
@@ -280,8 +311,12 @@ function renderBbsResults(data) {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.value = result.sourceUrl;
-    checkbox.checked = true;
-    checkbox.addEventListener('change', updateStartState);
+    checkbox.checked = data.searchMode !== 'recommend';
+    checkbox.setAttribute('aria-label', `选择 ${result.title}`);
+    checkbox.addEventListener('change', () => {
+      if (data.searchMode === 'recommend') resetRecommendDraft();
+      updateStartState();
+    });
 
     const text = document.createElement('span');
     text.className = 'category-text';
@@ -297,7 +332,7 @@ function renderBbsResults(data) {
     const metaParts = [
       result.forumName,
       result.author ? `作者 ${result.author}` : '',
-      result.sourceCreatedAt ? `发布时间 ${result.sourceCreatedAt}` : '',
+      result.sourceCreatedAt ? `发布时间 ${data.searchMode === 'recommend' ? `${RecommendTemplate.formatForumTime(result.publishedAt)}（美西）` : result.sourceCreatedAt}` : '',
       result.isReply ? '跟帖' : ''
     ].filter(Boolean);
     meta.textContent = metaParts.join(' | ');
@@ -311,9 +346,16 @@ function renderBbsResults(data) {
   const pages = Number.isFinite(data.pagesFetched) && data.pagesFetched > 1 ? `，已读取 ${data.pagesFetched} 页` : '，已读取第一页';
   //bbsSearchSummary.textContent = `找到 ${data.results.length} 条结果${pages}${total}。`;
   bbsSearchSummary.textContent = `${total}。`;
+  if (data.searchMode === 'recommend') {
+    bbsSearchSummary.textContent = `${data.complete ? '最近 36 小时共' : '已读取'} ${data.results.length} 篇主题帖${data.complete ? '' : '（结果尚不完整）'}。`;
+  }
+  bbsSearchWindow.hidden = data.searchMode !== 'recommend' || !data.windowStart || !data.startedAt;
+  bbsSearchWindow.textContent = bbsSearchWindow.hidden ? ''
+    : `检索范围：${RecommendTemplate.formatForumTime(data.windowStart)} 至 ${RecommendTemplate.formatForumTime(data.startedAt)}（论坛时间／美西，共 36 小时）。`;
   bbsResultsPanel.hidden = false;
   bbsStartButton.hidden = data.searchMode !== 'author';
   bbsCollectionButton.hidden = data.searchMode !== 'title';
+  bbsRecommendButton.hidden = data.searchMode !== 'recommend';
   bbsCollectionOutput.hidden = true;
   bbsCollectionOutput.textContent = '';
   updateStartState();
@@ -508,20 +550,28 @@ bbsSearchButton.addEventListener('click', async () => {
     return;
   }
 
-  if (!keyword) {
+  if (searchMode !== 'recommend' && !keyword) {
     appendSystemLine('请输入文学城ID或关键词。');
     bbsKeyword.focus();
     return;
   }
 
-  bbsSearchButton.disabled = true;
   clearBbsResults();
+  const requestId = bbsRequestId;
+  bbsAbortController = new AbortController();
+  const controller = bbsAbortController;
+  bbsSearchButton.disabled = true;
   setStatus('running');
-  appendSystemLine(`正在${searchMode === 'author' ? '按作者' : '按标题'}搜索 ${forum.name}...`);
+  appendSystemLine(searchMode === 'recommend' ? `正在读取 ${forum.name} 最近 36 小时的所有主题帖...` : `正在${searchMode === 'author' ? '按作者' : '按标题'}搜索 ${forum.name}...`);
 
   try {
+    if (searchMode === 'recommend') {
+      await searchRecentPosts(forum, requestId, controller);
+      return;
+    }
     const response = await fetch('/api/bbs/search', {
       method: 'POST',
+      signal: controller.signal,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         forumId: forum.id,
@@ -531,6 +581,7 @@ bbsSearchButton.addEventListener('click', async () => {
       })
     });
     const data = await response.json();
+    if (requestId !== bbsRequestId) return;
     if (!response.ok) {
       throw new Error(data.error || '论坛搜索失败。');
     }
@@ -539,10 +590,11 @@ bbsSearchButton.addEventListener('click', async () => {
     appendSystemLine(`找到 ${data.results.length} 条论坛结果。`);
     renderBbsResults(data);
   } catch (error) {
+    if (requestId !== bbsRequestId || error.name === 'AbortError') return;
     setStatus('failed');
     appendSystemLine(error.message);
   } finally {
-    bbsSearchButton.disabled = false;
+    if (requestId === bbsRequestId) bbsSearchButton.disabled = false;
   }
 });
 
@@ -554,6 +606,8 @@ bbsSelectAllButton.addEventListener('click', () => {
 });
 
 bbsSelectNoneButton.addEventListener('click', () => {
+  if (recommendBusy) return;
+  resetRecommendDraft();
   bbsResultsList.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
     checkbox.checked = false;
   });
@@ -578,6 +632,182 @@ bbsStartButton.addEventListener('click', () => {
   }
 
   startArchive([bbsCategoryFromSelection()], includeCommentsInput.checked);
+});
+
+async function searchRecentPosts(forum, requestId, controller) {
+  const posts = new Map();
+  const warnings = new Set();
+  let page = 1;
+  let startedAt;
+  let lastData;
+  try {
+    while (page) {
+      const response = await fetch('/api/bbs/search', {
+        method: 'POST', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(60000)]),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ forumId: forum.id, forumName: forum.name, searchMode: 'recommend', page, startedAt })
+      });
+      const data = await response.json();
+      if (requestId !== bbsRequestId) return;
+      if (!response.ok) throw new Error(data.error || '论坛读取失败，请重试。');
+      startedAt = data.startedAt;
+      data.results.forEach((post) => posts.set(post.sourceUrl, post));
+      (data.warnings || []).forEach((warning) => warnings.add(warning));
+      lastData = data;
+      appendSystemLine(`已读取第 ${page} 页，找到 ${posts.size} 篇最近 36 小时的主题帖。`);
+      if (data.nextPage !== null && data.nextPage !== page + 1) throw new Error('分页异常，请重新搜索。');
+      page = data.nextPage;
+    }
+    warnings.forEach(appendSystemLine);
+    setStatus(warnings.size ? 'failed' : 'idle');
+  } catch (error) {
+    if (requestId !== bbsRequestId || controller.signal.aborted) return;
+    warnings.add(error.message);
+    appendSystemLine(`检索尚未完成：${error.message} 可重新点击“下一步”。`);
+    setStatus('failed');
+  }
+  if (requestId !== bbsRequestId) return;
+  renderBbsResults({ ...lastData, searchMode: 'recommend', forumId: forum.id, forumName: forum.name,
+    results: [...posts.values()].sort((a, b) => b.publishedAt - a.publishedAt), complete: !page && !warnings.size });
+}
+
+function resetRecommendDraft() {
+  ++recommendRequestId;
+  recommendBusy = false;
+  recommendDraft = null;
+  bbsRecommendButton.textContent = '推贴';
+  bbsRecommendOutput.hidden = true;
+  recommendReasons.textContent = '';
+  recommendLetter.value = '';
+  recommendCopyStatus.textContent = '';
+}
+
+function syncRecommendLetter(force = false) {
+  if (!recommendDraft || !recommendDate.value) return;
+  if (recommendDraft.manualLetter && !force) {
+    document.querySelector('#recommend-refresh-letter').hidden = false;
+    recommendCopyStatus.textContent = '已保留你对整封信的修改；如需套用上方条目的更改，请点击重新生成整封信。';
+    return;
+  }
+  recommendDraft.manualLetter = false;
+  recommendLetter.value = RecommendTemplate.formatLetter({ date: recommendDate.value, forum: recommendDraft.forum, posts: recommendDraft.posts });
+  document.querySelector('#recommend-refresh-letter').hidden = true;
+  recommendCopyStatus.textContent = '';
+}
+
+function renderRecommendReasons() {
+  recommendReasons.textContent = '';
+  recommendDraft.posts.forEach((post, index) => {
+    const row = document.createElement('div');
+    row.className = 'recommend-reason';
+    const link = document.createElement('a');
+    link.href = post.sourceUrl;
+    link.target = '_blank';
+    link.rel = 'noreferrer';
+    link.textContent = `${index + 1}，${post.title}`;
+    const label = document.createElement('label');
+    label.textContent = '推荐原因';
+    const input = document.createElement('textarea');
+    input.rows = 2;
+    input.value = post.reason || '';
+    input.placeholder = '读取正文后自动生成，也可手动填写';
+    input.disabled = recommendBusy;
+    input.addEventListener('input', () => {
+      post.reason = input.value;
+      syncRecommendLetter();
+    });
+    label.appendChild(input);
+    row.append(link, label);
+    if (post.error) {
+      const message = document.createElement('p');
+      message.className = 'recommend-error';
+      message.textContent = post.error;
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = '重试此篇';
+      retry.disabled = recommendBusy;
+      retry.addEventListener('click', () => generateRecommendation([post]));
+      row.append(message, retry);
+    }
+    recommendReasons.appendChild(row);
+  });
+}
+
+async function generateRecommendation(posts) {
+  if (recommendBusy || !recommendDraft) return;
+  const requestId = ++recommendRequestId;
+  recommendBusy = true;
+  bbsRecommendButton.textContent = '正在阅读并生成…';
+  updateStartState();
+  renderRecommendReasons();
+  setStatus('running');
+  appendSystemLine(`正在阅读 ${posts.length} 篇正文并生成推荐原因…`);
+  try {
+    const response = await fetch('/api/bbs/recommend', {
+      method: 'POST', signal: AbortSignal.timeout(55000),
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ forumId: recommendDraft.forum.id, posts: posts.map((post) => ({ sourceUrl: post.sourceUrl })) })
+    });
+    const data = await response.json();
+    if (requestId !== recommendRequestId) return;
+    if (!response.ok) throw new Error(data.error || '推贴生成失败，请重试。');
+    for (const post of posts) {
+      const result = data.results.find((item) => item.sourceUrl === post.sourceUrl);
+      if (!result) { post.error = '未收到此篇结果，请重试。'; continue; }
+      if (result.title) post.title = result.title;
+      if (result.author) post.author = result.author;
+      if (result.reason) post.reason = result.reason;
+      post.error = result.error || '';
+    }
+    const hasErrors = recommendDraft.posts.some((post) => post.error);
+    setStatus(hasErrors ? 'failed' : 'complete');
+    appendSystemLine(hasErrors ? '部分推荐原因未能生成，请查看各篇提示，重试或手动填写。' : '推荐信已生成，请检查后复制。');
+  } catch (error) {
+    if (requestId !== recommendRequestId) return;
+    const message = error.name === 'TimeoutError' ? '生成超时，请重试或手动填写推荐原因。' : error.message;
+    posts.forEach((post) => { post.error = message; });
+    setStatus('failed');
+    appendSystemLine(message);
+  } finally {
+    if (requestId === recommendRequestId) {
+      recommendBusy = false;
+      bbsRecommendButton.textContent = '推贴';
+      renderRecommendReasons();
+      syncRecommendLetter();
+      updateStartState();
+    }
+  }
+}
+
+bbsRecommendButton.addEventListener('click', () => {
+  const selected = selectedBbsResults();
+  if (selected.length < 1 || selected.length > 5 || recommendBusy) return;
+  if (!recommendDraft) {
+    recommendDraft = { forum: selectedForum(), posts: selected.map((post) => ({ ...post, reason: '', error: '' })), manualLetter: false };
+    recommendDate.value = RecommendTemplate.localDate();
+    syncRecommendLetter();
+  }
+  bbsRecommendOutput.hidden = false;
+  const pending = recommendDraft.posts.filter((post) => !post.reason);
+  if (pending.length) generateRecommendation(pending);
+  bbsRecommendOutput.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+});
+recommendDate.addEventListener('change', () => syncRecommendLetter());
+recommendLetter.addEventListener('input', () => {
+  if (recommendDraft) recommendDraft.manualLetter = true;
+  recommendCopyStatus.textContent = '';
+});
+document.querySelector('#recommend-refresh-letter').addEventListener('click', () => syncRecommendLetter(true));
+document.querySelector('#recommend-copy').addEventListener('click', async () => {
+  if (!recommendLetter.value) return;
+  try {
+    await navigator.clipboard.writeText(recommendLetter.value);
+    recommendCopyStatus.textContent = '推荐信已复制，可粘贴给网管。';
+  } catch {
+    recommendLetter.focus();
+    recommendLetter.select();
+    recommendCopyStatus.textContent = '自动复制不可用，已选中推荐信，请按 Ctrl+C 或长按复制。';
+  }
 });
 
 bbsCollectionButton.addEventListener('click', () => {
@@ -808,6 +1038,9 @@ function updateSourceTypeUI() {
 
 function updateBbsKeywordLabel() {
   const searchMode = currentBbsSearchMode();
+  document.querySelector('#bbs-keyword-field').hidden = searchMode === 'recommend';
+  document.querySelector('#bbs-recommend-hint').hidden = searchMode !== 'recommend';
+  bbsKeyword.disabled = searchMode === 'recommend';
   const label = document.querySelector('#bbs-keyword-label');
   if (!label) {
     return;

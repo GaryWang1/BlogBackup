@@ -30,6 +30,7 @@
           <li><strong>博客备份。</strong>粘贴博主博客首页网址，例如 <code>https://blog.wenxuecity.com/myoverview/41038/</code>，点击“下一步”，勾选要保存的分类，再点击“开始下载”。</li>
           <li><strong>论坛备份。</strong>选择“论坛”后直接选择论坛版块；然后用“文学城ID”按作者查找。挑选打算下载的帖子，选中结果后可以“开始下载”。</li>
           <li><strong>制作合集。</strong>选择“论坛”后直接选择论坛版块；然后用“关键词”按标题查找。选中结果后点击“做合集”。</li>
+          <li><strong>推贴。</strong>选择“推贴”，无需搜索词，点击“下一步”读取当前论坛最近 36 小时的所有主题帖（不含跟帖）。选择 1–5 篇后点击“推贴”，自动阅读正文并生成推荐原因；检查、编辑推荐信后点击“一键复制”。</li>
 		  <li><strong>增量下载。</strong>默认只下载新增文章或帖子；如果想重新下载保存已归档内容，取消“增量下载”。</li>
           <li><strong>跟帖保存。</strong>勾选“包含跟帖”后，文章页面会尽量保存评论、跟帖和相关资源。</li>
           <li><strong>离线阅读。</strong>下载完成后点击右上角“阅读”，进入归档首页；也可以在归档页、博客页和分类页用搜索框按页面标题或正文内容查找已保存内容。</li>
@@ -104,21 +105,26 @@
               <select id="bbs-forum"></select>
             </label>
 
-            <div class="radio-row" role="radiogroup" aria-label="BBS search mode">
+            <div class="radio-row bbs-search-modes" role="radiogroup" aria-label="论坛搜索方式">
               <label class="choice-row">
                 <input type="radio" name="bbs-search-mode" value="author" checked>
                 <span>文学城ID</span>
               </label>
               <label class="choice-row">
                 <input type="radio" name="bbs-search-mode" value="title">
-                <span>关键词</span>
+                <span>关键词(做合集)</span>
+              </label>
+              <label class="choice-row">
+                <input type="radio" name="bbs-search-mode" value="recommend">
+                <span>推贴</span>
               </label>
             </div>
 
-            <label>
+            <label id="bbs-keyword-field">
               <span id="bbs-keyword-label">文学城ID</span>
               <input id="bbs-keyword" name="bbsKeyword" type="text" autocomplete="off">
             </label>
+            <p id="bbs-recommend-hint" class="muted" hidden>搜索当前论坛最近 36 小时的所有主题帖，无需搜索词。请选择 1–5 篇生成推荐信。</p>
 
             <button id="bbs-search-button" type="button">下一步</button>
 
@@ -130,15 +136,29 @@
                 <button id="bbs-select-none" type="button">不选</button>
               </div>
             </div>
+            <p id="bbs-search-window" class="muted search-window" hidden></p>
             <div id="bbs-results-list" class="category-list result-list"></div>
+            <p id="bbs-selected-count" class="muted" aria-live="polite" hidden></p>
             <button id="bbs-start-button" type="button" hidden>开始下载</button>
             <button id="bbs-collection-button" type="button" hidden>做合集</button>
+            <button id="bbs-recommend-button" type="button" hidden disabled>推贴</button>
           </div>
+        </div>
         </div>
       </section>
     </section>
 
     <section class="status-panel" aria-labelledby="status-title">
+      <section id="bbs-recommend-output" class="recommend-output" aria-labelledby="recommend-title" hidden>
+        <h2 id="recommend-title">推贴推荐信</h2>
+        <label>推荐日期<input id="recommend-date" type="date" required></label>
+        <p class="muted">可修改每篇推荐原因，也可直接编辑整封信。复制前请检查内容。</p>
+        <div id="recommend-reasons" class="field-stack"></div>
+        <label>完整推荐信<textarea id="recommend-letter" rows="20"></textarea></label>
+        <button id="recommend-refresh-letter" type="button" hidden>用上方条目重新生成整封信（替换手动修改）</button>
+        <button id="recommend-copy" type="button">一键复制</button>
+        <p id="recommend-copy-status" class="muted" role="status"></p>
+      </section>
       <div id="bbs-collection-output" class="collection-output" hidden></div>
       <div class="status-heading">
         <h2 id="status-title">状态</h2>
@@ -148,6 +168,7 @@
     </section>
   </main>
 
-  <script src="/app.js?v=download-flow-2"></script>
+  <script src="/recommend-template.js?v=2"></script>
+  <script src="/app.js?v=recommend-2"></script>
 </body>
 </html>
