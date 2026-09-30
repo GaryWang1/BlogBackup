@@ -18,7 +18,12 @@
     const entries = posts.map((p, i) => `${i + 1}，${p.reason || '【请填写推荐原因】'}\n标题：${p.title}\n来源：${p.author || '【请核对作者】'}\n${p.sourceUrl}`);
     return `您好，网管\n\n${Number(month)}月${Number(day)}日的${heading}优秀作品推荐：\n\n${entries.join('\n\n')}\n\n谢谢支持\n${forum.name}。`;
   }
-  const api = { localDate, formatLetter, formatForumTime };
+  function letterHtml(text) {
+    const escape = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    return escape(text).replace(/https:\/\/bbs\.wenxuecity\.com\/[a-zA-Z0-9_-]+\/\d+\.html/g,
+      (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`).replace(/\n/g, '<br>');
+  }
+  const api = { localDate, formatLetter, formatForumTime, letterHtml };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.RecommendTemplate = api;
 })(typeof window === 'undefined' ? globalThis : window);

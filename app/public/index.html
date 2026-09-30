@@ -154,7 +154,9 @@
         <label>推荐日期<input id="recommend-date" type="date" required></label>
         <p class="muted">可修改每篇推荐原因，也可直接编辑整封信。复制前请检查内容。</p>
         <div id="recommend-reasons" class="field-stack"></div>
-        <label>完整推荐信<textarea id="recommend-letter" rows="20"></textarea></label>
+        <div>完整推荐信</div>
+        <div id="recommend-letter-preview" class="recommend-letter-preview"></div>
+        <label>编辑推荐信文字<textarea id="recommend-letter" rows="8"></textarea></label>
         <button id="recommend-refresh-letter" type="button" hidden>用上方条目重新生成整封信（替换手动修改）</button>
         <button id="recommend-copy" type="button">一键复制</button>
         <p id="recommend-copy-status" class="muted" role="status"></p>

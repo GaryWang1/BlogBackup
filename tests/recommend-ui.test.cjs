@@ -93,6 +93,13 @@ test('no search term required; all pages load; select 1–5; generate, edit and 
   assert.equal(await page.locator('#recommend-refresh-letter').isVisible(), true);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.locator('#recommend-copy').click();
+  await page.waitForFunction(() => document.querySelector('#recommend-copy-status').textContent.includes('已复制'));
+  assert.equal(await page.locator('#recommend-letter-preview a').first().getAttribute('href'), 'https://bbs.wenxuecity.com/romance/1.html');
+  const copiedHtml = await page.evaluate(async () => {
+    const items = await navigator.clipboard.read();
+    return (await items[0].getType('text/html')).text();
+  });
+  assert.match(copiedHtml, /href="https:\/\/bbs\.wenxuecity\.com\/romance\/1\.html"/);
   assert.equal((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n'), letter + '\n我的备注');
   await fs.mkdir(path.join(__dirname, '../logs'), { recursive: true });
   await page.screenshot({ path: path.join(__dirname, '../logs/recommend-desktop.png'), fullPage: true });

@@ -679,6 +679,7 @@ function resetRecommendDraft() {
   bbsRecommendOutput.hidden = true;
   recommendReasons.textContent = '';
   recommendLetter.value = '';
+  document.querySelector('#recommend-letter-preview').textContent = '';
   recommendCopyStatus.textContent = '';
 }
 
@@ -691,6 +692,7 @@ function syncRecommendLetter(force = false) {
   }
   recommendDraft.manualLetter = false;
   recommendLetter.value = RecommendTemplate.formatLetter({ date: recommendDate.value, forum: recommendDraft.forum, posts: recommendDraft.posts });
+  document.querySelector('#recommend-letter-preview').innerHTML = RecommendTemplate.letterHtml(recommendLetter.value);
   document.querySelector('#recommend-refresh-letter').hidden = true;
   recommendCopyStatus.textContent = '';
 }
@@ -794,6 +796,7 @@ bbsRecommendButton.addEventListener('click', () => {
 });
 recommendDate.addEventListener('change', () => syncRecommendLetter());
 recommendLetter.addEventListener('input', () => {
+  document.querySelector('#recommend-letter-preview').innerHTML = RecommendTemplate.letterHtml(recommendLetter.value);
   if (recommendDraft) recommendDraft.manualLetter = true;
   recommendCopyStatus.textContent = '';
 });
@@ -801,7 +804,18 @@ document.querySelector('#recommend-refresh-letter').addEventListener('click', ()
 document.querySelector('#recommend-copy').addEventListener('click', async () => {
   if (!recommendLetter.value) return;
   try {
-    await navigator.clipboard.writeText(recommendLetter.value);
+    if (window.ClipboardItem && navigator.clipboard.write) {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/plain': new Blob([recommendLetter.value], { type: 'text/plain' }),
+          'text/html': new Blob([RecommendTemplate.letterHtml(recommendLetter.value)], { type: 'text/html' })
+        })]);
+      } catch {
+        await navigator.clipboard.writeText(recommendLetter.value);
+      }
+    } else {
+      await navigator.clipboard.writeText(recommendLetter.value);
+    }
     recommendCopyStatus.textContent = '推荐信已复制，可粘贴给网管。';
   } catch {
     recommendLetter.focus();

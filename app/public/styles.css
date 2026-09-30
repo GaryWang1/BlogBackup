@@ -548,3 +548,5 @@ button:disabled {
 #download-options .check-row + .check-row {
   margin-top: 10px;
 }
+
+.recommend-letter-preview { padding: 14px; border: 1px solid #d4deeb; border-radius: 8px; line-height: 1.7; overflow-wrap: anywhere; background: #fff; }
