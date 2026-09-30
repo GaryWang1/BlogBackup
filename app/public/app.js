@@ -868,8 +868,28 @@ bbsCollectionButton.addEventListener('click', () => {
     list.appendChild(item);
   }
 
-  // append and highlight
-  bbsCollectionOutput.appendChild(list);
+  const collection = document.createElement('div');
+  collection.appendChild(list);
+  const summary = document.createElement('section');
+  summary.className = 'collection-summary';
+  const total = document.createElement('p');
+  total.textContent = `本合集共 ${selected.length} 个帖子。`;
+  const heading = document.createElement('p');
+  heading.textContent = '各 ID 在本合集中的发帖数（从多到少）：';
+  const counts = new Map();
+  for (const result of selected) {
+    const userId = bbsResultUserId(result) || '未知 ID';
+    counts.set(userId, (counts.get(userId) || 0) + 1);
+  }
+  const ranking = document.createElement('ol');
+  for (const [userId, count] of [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-CN'))) {
+    const row = document.createElement('li');
+    row.textContent = `${userId}：${count} 个帖子`;
+    ranking.appendChild(row);
+  }
+  summary.append(total, heading, ranking);
+  collection.appendChild(summary);
+  bbsCollectionOutput.appendChild(collection);
   bbsCollectionOutput.hidden = false;
 
   // visually highlight each item
@@ -877,7 +897,7 @@ bbsCollectionButton.addEventListener('click', () => {
 
   // select the collection HTML for convenience
   try {
-    const html = list.outerHTML;
+    const html = collection.outerHTML;
     // copy HTML to clipboard as text (for pasting into HTML-mode editors)
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(html).then(() => {
@@ -901,7 +921,7 @@ bbsCollectionButton.addEventListener('click', () => {
 
     // also select the rendered nodes
     const range = document.createRange();
-    range.selectNodeContents(list);
+    range.selectNodeContents(collection);
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);

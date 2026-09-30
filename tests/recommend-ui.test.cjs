@@ -134,6 +134,25 @@ test('keyword and author flows still show input and their original actions', asy
   }
 });
 
+test('collection counts selected posts by ID and includes statistics in copied HTML', async (t) => {
+  const { page } = await setup(t, { search: (route, body) => route.fulfill({ json: {
+    ...body,
+    results: posts.map((post, i) => ({ ...post, author: i < 4 ? '多帖作者' : '少帖作者' })), totalCount: 7
+  } }) });
+  await page.locator('input[name="bbs-search-mode"][value="title"]').check();
+  await page.locator('#bbs-keyword').fill('中秋');
+  await page.locator('#bbs-search-button').click();
+  await page.locator('#bbs-results-list input').last().uncheck();
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (html) => { window.collectionCopy = html; } } }));
+  await page.locator('#bbs-collection-button').click();
+  await page.waitForFunction(() => document.querySelector('.collection-copied-message')?.textContent.includes('已经复制'));
+  assert.match(await page.locator('.collection-summary').innerText(), /本合集共 6 个帖子/);
+  assert.deepEqual(await page.locator('.collection-summary li').allTextContents(), ['多帖作者：4 个帖子', '少帖作者：2 个帖子']);
+  const copied = await page.evaluate(() => window.collectionCopy);
+  assert.match(copied, /本合集共 6 个帖子/);
+  assert.match(copied, /多帖作者：4 个帖子/);
+});
+
 test('a failed later page is shown as incomplete, with earlier results retained', async (t) => {
   const { page } = await setup(t, { search: (route, body) => body.page === 1
     ? route.fulfill({ json: { results: posts, nextPage: 2, startedAt: '2026-09-29T12:00:00Z', warnings: [] } })
