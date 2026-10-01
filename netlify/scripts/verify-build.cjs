@@ -7,6 +7,7 @@ const required = [
   'app/public/app.js',
   'app/public/styles.css',
   'app/public/recommend-template.js',
+  'app/public/moderator.js',
   'app/server/src/bbs-recommend.js',
   'app/server/src/gemini-client.js',
   'netlify/functions/api.mjs',

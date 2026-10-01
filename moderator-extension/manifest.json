@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "文学城推贴状态助手",
+  "version": "1.0.0",
+  "description": "在本机检查版主可见的已推荐标记，不上传账号或 Cookie。",
+  "permissions": ["scripting"],
+  "host_permissions": ["https://bbs.wenxuecity.com/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{
+    "matches": ["https://dainty-praline-c54396.netlify.app/*", "http://localhost/*", "http://127.0.0.1/*"],
+    "js": ["bridge.js"],
+    "run_at": "document_start"
+  }]
+}

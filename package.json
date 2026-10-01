@@ -4,7 +4,7 @@
   "private": true,
   "description": "Netlify web version of the Blog Backup offline archive tool.",
   "scripts": {
-    "test": "node --test app/server/src/*.test.js",
+    "test": "node --test app/server/src/*.test.js tests/moderator-extension.test.cjs",
     "test:ui": "node --test tests/recommend-ui.test.cjs",
     "dev": "netlify dev",
     "build": "node netlify/scripts/verify-build.cjs"

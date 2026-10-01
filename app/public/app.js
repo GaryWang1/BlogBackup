@@ -43,6 +43,52 @@ const usageToggle = document.querySelector('#usage-toggle');
 const usagePanel = document.querySelector('#usage-panel');
 const runtimeToggle = document.querySelector('#runtime-toggle');
 const runtimeNotice = document.querySelector('#runtime-notice');
+const moderator = new ModeratorController(updateModeratorRows);
+let moderatorPreflight = false;
+const moderatorPanel = document.createElement('div');
+moderatorPanel.innerHTML = '<button id="moderator-connect" type="button">连接文学城版主账号（可选）</button><button id="moderator-retry" type="button" hidden>登录后检查 / 重试</button><button id="moderator-disconnect" type="button" hidden>断开连接</button><p id="moderator-status" class="muted" role="status">未连接：所有功能均可使用。</p><p class="muted">需安装“文学城推贴状态助手”扩展。账号密码只在文学城官方页面输入。</p>';
+bbsForum.parentElement.after(moderatorPanel);
+const moderatorStatus = moderatorPanel.querySelector('#moderator-status');
+function updateModeratorRows() {
+  bbsResultsList.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
+    let label = checkbox.parentElement.querySelector('.moderator-state');
+    if (!label) { label = document.createElement('span'); label.className = 'moderator-state category-meta'; checkbox.parentElement.querySelector('.category-text').append(label); }
+    const state = bbsSearchState?.searchMode === 'recommend' && moderator.connected ? moderator.states.get(checkbox.value) : null;
+    label.textContent = state?.status === 'recommended' ? `已推荐 ${state.recommendedAt || ''}（美西）` : state?.status === 'checking' ? '正在检查推荐状态…' : state?.status === 'unknown' ? `无法确认：${state.error || '请重试'}（仍可选择）` : state?.status === 'not-recommended' ? '未推荐' : '';
+    if (state?.status === 'recommended') {
+      if (checkbox.checked) resetRecommendDraft();
+      checkbox.checked = false;
+    }
+  });
+  updateStartState();
+}
+async function checkModeratorResults() {
+  if (moderatorPreflight) return;
+  if (moderator.connected && bbsSearchState?.searchMode === 'recommend') {
+    await moderator.check(bbsSearchState.forumId, bbsSearchState.results.map((p) => p.sourceUrl));
+  }
+}
+moderatorPanel.querySelector('#moderator-connect').addEventListener('click', async () => {
+  const button = moderatorPanel.querySelector('#moderator-connect');
+  button.disabled = true;
+  try {
+    await moderator.connect(selectedForum().id);
+    moderatorStatus.textContent = '助手已连接。请在文学城页面登录当前论坛的版主账号，返回后点击“登录后检查 / 重试”。';
+    moderatorPanel.querySelector('#moderator-retry').hidden = false;
+    moderatorPanel.querySelector('#moderator-disconnect').hidden = false;
+    button.hidden = true;
+  } catch (error) { moderatorStatus.textContent = error.message; }
+  finally { button.disabled = false; }
+});
+moderatorPanel.querySelector('#moderator-retry').addEventListener('click', checkModeratorResults);
+moderatorPanel.querySelector('#moderator-disconnect').addEventListener('click', () => {
+  moderator.disconnect(); resetRecommendDraft(); moderatorPreflight = false;
+  moderatorPanel.querySelector('#moderator-connect').hidden = false;
+  moderatorPanel.querySelector('#moderator-retry').hidden = true;
+  moderatorPanel.querySelector('#moderator-disconnect').hidden = true;
+  moderatorStatus.textContent = '已断开：恢复访客模式。文学城账号仍保持登录。';
+  updateStartState();
+});
 
 function bindPanelToggle(toggle, panel) {
   if (!toggle || !panel) {
@@ -162,7 +208,7 @@ function selectedBbsResults() {
     [...bbsResultsList.querySelectorAll('input[type="checkbox"]:checked')]
       .map((input) => input.value)
   );
-  return bbsSearchState.results.filter((result) => selectedUrls.has(result.sourceUrl));
+  return bbsSearchState.results.filter((result) => selectedUrls.has(result.sourceUrl) && !(bbsSearchState.searchMode === 'recommend' && moderator.blocked(result.sourceUrl)));
 }
 
 function bbsResultUserId(result) {
@@ -187,16 +233,18 @@ function updateStartState() {
   bbsCollectionButton.disabled = sourceMode !== 'bbs' || selectedBbsResults().length === 0 || Boolean(activeJobId);
   const count = selectedBbsResults().length;
   const recommending = bbsSearchState?.searchMode === 'recommend';
-  bbsRecommendButton.disabled = !recommending || count < 1 || count > 5 || recommendBusy || Boolean(activeJobId);
+  bbsRecommendButton.disabled = !recommending || count < 1 || count > 5 || recommendBusy || moderatorPreflight || Boolean(activeJobId);
   bbsSelectedCount.hidden = !recommending;
   bbsSelectedCount.textContent = `已选 ${count}/5 篇`;
   bbsSelectAllButton.hidden = recommending;
   bbsResultsList.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
-    checkbox.disabled = recommending && (recommendBusy || (count >= 5 && !checkbox.checked));
+    checkbox.disabled = recommending && (recommendBusy || moderatorPreflight || moderator.blocked(checkbox.value) || (count >= 5 && !checkbox.checked));
   });
 }
 
 function clearBbsResults() {
+  moderator.cancel();
+  moderatorPreflight = false;
   ++bbsRequestId;
   bbsAbortController?.abort();
   bbsAbortController = null;
@@ -359,6 +407,7 @@ function renderBbsResults(data) {
   bbsCollectionOutput.hidden = true;
   bbsCollectionOutput.textContent = '';
   updateStartState();
+  checkModeratorResults();
 }
 
 function hashText(value) {
@@ -522,7 +571,7 @@ inspectForm.addEventListener('submit', (event) => {
 
 selectAllButton.addEventListener('click', () => {
   categoryList.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
-    checkbox.checked = true;
+    if (!checkbox.disabled) checkbox.checked = true;
   });
   updateStartState();
 });
@@ -600,7 +649,7 @@ bbsSearchButton.addEventListener('click', async () => {
 
 bbsSelectAllButton.addEventListener('click', () => {
   bbsResultsList.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {
-    checkbox.checked = true;
+    if (!checkbox.disabled) checkbox.checked = true;
   });
   updateStartState();
 });
@@ -774,9 +823,26 @@ async function generateRecommendation(posts) {
   }
 }
 
-bbsRecommendButton.addEventListener('click', () => {
-  const selected = selectedBbsResults();
+bbsRecommendButton.addEventListener('click', async () => {
+  let selected = selectedBbsResults();
   if (selected.length < 1 || selected.length > 5 || recommendBusy) return;
+  if (moderator.connected) {
+    const state = bbsSearchState;
+    moderatorPreflight = true;
+    const checking = moderator.check(state.forumId, selected.map((p) => p.sourceUrl));
+    const version = moderator.version;
+    await checking;
+    if (version !== moderator.version) return;
+    moderatorPreflight = false;
+    updateStartState();
+    if (state !== bbsSearchState || !moderator.connected) return;
+    const previous = selected.length;
+    selected = selectedBbsResults();
+    if (selected.length < previous) appendSystemLine('已移除文学城上已推荐的帖子。');
+    if (selected.some((p) => moderator.states.get(p.sourceUrl)?.status === 'unknown')) appendSystemLine('部分帖子无法确认推荐状态，将按你的选择继续生成。');
+    if (!selected.length || version !== moderator.version) return;
+    resetRecommendDraft();
+  }
   if (!recommendDraft) {
     recommendDraft = { forum: selectedForum(), posts: selected.map((post) => ({ ...post, reason: '', error: '' })), manualLetter: false };
     recommendDate.value = RecommendTemplate.localDate();

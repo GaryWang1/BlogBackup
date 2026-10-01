@@ -18,7 +18,7 @@ before(async () => {
   server = http.createServer(async (req, res) => {
     const name = new URL(req.url, 'http://localhost').pathname;
     const file = name === '/' ? 'index.html' : name.slice(1);
-    if (!['index.html', 'app.js', 'styles.css', 'recommend-template.js'].includes(file)) { res.writeHead(404).end(); return; }
+    if (!['index.html', 'app.js', 'styles.css', 'recommend-template.js', 'moderator.js'].includes(file)) { res.writeHead(404).end(); return; }
     const types = { html: 'text/html', js: 'text/javascript', css: 'text/css' };
     res.setHeader('content-type', `${types[file.split('.').pop()]}; charset=utf-8`);
     res.end(await fs.readFile(path.join(__dirname, '../app/public', file)));
@@ -151,6 +151,94 @@ test('collection counts selected posts by ID and includes statistics in copied H
   const copied = await page.evaluate(() => window.collectionCopy);
   assert.match(copied, /本合集共 6 个帖子/);
   assert.match(copied, /多帖作者：4 个帖子/);
+});
+
+test('moderator checks disable recommended posts, allow unknown, recheck before AI and disconnect', async (t) => {
+  const { page } = await setup(t);
+  await page.evaluate(() => {
+    window.checkCalls = 0;
+    window.addEventListener('message', (event) => {
+      const m = event.data;
+      if (m?.channel !== 'wxc-moderator-request') return;
+      const reply = (data) => window.postMessage({ channel: 'wxc-moderator-response', id: m.id, ...data }, location.origin);
+      if (m.action === 'check') {
+        window.checkCalls++;
+        for (const sourceUrl of m.urls) reply({ result: { sourceUrl, status: sourceUrl.endsWith('/1.html') || (window.checkCalls > 1 && sourceUrl.endsWith('/2.html')) ? 'recommended' : sourceUrl.endsWith('/3.html') ? 'unknown' : 'not-recommended', recommendedAt: '2026-09-29 20:26:49', error: '登录过期' } });
+      }
+      reply({ done: true });
+    });
+  });
+  await page.locator('#moderator-connect').click();
+  await page.locator('#moderator-disconnect').waitFor({ state: 'visible' });
+  await page.locator('#bbs-search-button').click();
+  await page.waitForFunction(() => document.querySelector('.moderator-state')?.textContent.includes('已推荐'));
+  const inputs = page.locator('#bbs-results-list input');
+  assert.equal(await inputs.nth(0).isDisabled(), true);
+  assert.equal(await inputs.nth(2).isDisabled(), false);
+  await inputs.nth(1).check();
+  await inputs.nth(2).check();
+  await page.locator('#bbs-recommend-button').click();
+  await page.waitForFunction(() => document.querySelector('#recommend-letter').value.includes('温暖细腻'));
+  assert.equal(await inputs.nth(1).isChecked(), false);
+  assert.equal(await inputs.nth(1).isDisabled(), true);
+  assert.equal(await page.locator('#recommend-reasons textarea').count(), 1);
+  await page.locator('#moderator-disconnect').click();
+  assert.equal(await inputs.nth(0).isDisabled(), false);
+  assert.equal(await page.locator('.moderator-state').first().innerText(), '');
+});
+
+test('moderator controller batches checks and ignores results after forum reset', async (t) => {
+  const { page } = await setup(t);
+  const result = await page.evaluate(async () => {
+    const controller = new ModeratorController(() => {});
+    controller.connected = true;
+    const sizes = [];
+    let delayed;
+    window.addEventListener('message', (event) => {
+      const m = event.data;
+      if (m?.channel !== 'wxc-moderator-request' || m.action !== 'check') return;
+      const reply = () => {
+        for (const sourceUrl of m.urls) window.postMessage({ channel: 'wxc-moderator-response', id: m.id, result: { sourceUrl, status: 'recommended' } }, location.origin);
+        window.postMessage({ channel: 'wxc-moderator-response', id: m.id, done: true }, location.origin);
+      };
+      sizes.push(m.urls.length);
+      if (m.forum === 'music') delayed = reply;
+      else reply();
+    });
+    await controller.check('romance', Array.from({ length: 23 }, (_, i) => `https://bbs.wenxuecity.com/romance/${i}.html`));
+    const count = controller.states.size;
+    const pending = controller.check('music', ['https://bbs.wenxuecity.com/music/1.html']);
+    while (!delayed) await new Promise((resolve) => setTimeout(resolve, 5));
+    controller.cancel(); delayed(); await pending;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return { sizes, count, remaining: controller.states.size };
+  });
+  assert.deepEqual(result, { sizes: [10, 10, 3, 1], count: 23, remaining: 0 });
+});
+
+test('moderator reader validates admin menu and ignores body spoofing', async (t) => {
+  const context = await browser.newContext();
+  t.after(() => context.close());
+  const page = await context.newPage();
+  await page.route('https://bbs.wenxuecity.com/**', (route) => route.fulfill({ body: '<html></html>', contentType: 'text/html' }));
+  await page.goto('https://bbs.wenxuecity.com/romance/');
+  const reader = require('../moderator-extension/reader.js');
+  const sourceUrl = 'https://bbs.wenxuecity.com/romance/123.html';
+  const base = '<h1 class="title">标题</h1><div id="postmeta">作者</div>';
+  const menu = '<a class="moderator" href="/romance/moderator/menu/123/?backSubid=romance">管理菜单</a>';
+  for (const [html, expected] of [
+    [base + `<div id="adminmenu">${menu}<strong>本文于 2026-09-29 20:26:49 被推荐</strong></div>`, 'recommended'],
+    [base + `<div id="adminmenu">${menu}</div><article>本文于 2026-09-29 20:26:49 被推荐</article>`, 'not-recommended'],
+    [base, 'unknown'],
+    ['<form>登录 验证码</form>', 'unknown'],
+    [base + `<div id="adminmenu">${menu.replace('/romance/', '/music/')}</div>`, 'unknown'],
+    [base + `<div id="adminmenu">${menu.replace('/123/', '/999/')}</div>`, 'unknown']
+  ]) {
+    await page.evaluate((html) => { window.fetch = async () => ({ ok: true, text: async () => html }); }, html);
+    assert.equal((await page.evaluate(reader, sourceUrl)).status, expected);
+  }
+  await page.evaluate(() => { window.fetch = async () => { throw Error('network'); }; });
+  assert.equal((await page.evaluate(reader, sourceUrl)).status, 'unknown');
 });
 
 test('a failed later page is shown as incomplete, with earlier results retained', async (t) => {
