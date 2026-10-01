@@ -2,7 +2,7 @@ const cheerio = require('cheerio');
 const { API, resolveGeminiModel, apiError } = require('./gemini-client');
 
 const HOME = 'https://bbs.wenxuecity.com/';
-const WINDOW_MS = 36 * 60 * 60 * 1000;
+const WINDOW_MS = 48 * 60 * 60 * 1000;
 const SOURCE_TIME_ZONE = 'America/Los_Angeles';
 const forumClock = new Intl.DateTimeFormat('en-CA', {
   timeZone: SOURCE_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -123,7 +123,7 @@ async function mapLimited(items, limit, fn) {
 }
 
 // One source page per API call keeps busy forums within Netlify request timeouts.
-// The browser follows nextPage until the entire 36-hour window is covered.
+// The browser follows nextPage until the entire 48-hour window is covered.
 async function searchRecentBbs({ forumId: id, forumName, page = 1, startedAt }, { read = fetchPage, now = Date.now() } = {}) {
   const forum = forumId(id);
   page = Number(page);

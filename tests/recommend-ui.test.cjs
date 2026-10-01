@@ -46,7 +46,7 @@ async function setup(t, overrides = {}) {
       searches.push(body);
       if (overrides.search) return overrides.search(route, body);
       if (body.searchMode !== 'recommend') return json({ ...body, results: posts, totalCount: 7 });
-      return json({ ...body, results: body.page === 1 ? posts : [], startedAt: '2026-09-29T19:00:00Z', windowStart: '2026-09-28T07:00:00Z', nextPage: body.page === 1 ? 2 : null, warnings: [] });
+      return json({ ...body, results: body.page === 1 ? posts : [], startedAt: '2026-09-29T19:00:00Z', windowStart: '2026-09-27T19:00:00Z', nextPage: body.page === 1 ? 2 : null, warnings: [] });
     }
     if (pathname === '/api/bbs/recommend') {
       if (overrides.recommend) return overrides.recommend(route, body);
@@ -70,8 +70,8 @@ test('no search term required; all pages load; select 1–5; generate, edit and 
   assert.equal(await page.locator('#bbs-results-list input').count(), 7);
   assert.equal(searches.length, 2);
   assert.ok(searches.every((r) => !r.keyword));
-  assert.match(await page.locator('#bbs-search-summary').innerText(), /最近 36 小时共 7/);
-  assert.equal(await page.locator('#bbs-search-window').innerText(), '检索范围：2026-09-28 00:00:00 至 2026-09-29 12:00:00（论坛时间／美西，共 36 小时）。');
+  assert.match(await page.locator('#bbs-search-summary').innerText(), /最近 48 小时共 7/);
+  assert.equal(await page.locator('#bbs-search-window').innerText(), '检索范围：2026-09-27 12:00:00 至 2026-09-29 12:00:00（论坛时间／美西，共 48 小时）。');
   assert.match(await page.locator('#bbs-results-list .category-meta').first().innerText(), /2026-09-28 18:00:00（美西）/);
   assert.equal(await page.locator('#bbs-recommend-button').isDisabled(), true);
   for (let i = 0; i < 5; i++) await page.locator('#bbs-results-list input').nth(i).check();

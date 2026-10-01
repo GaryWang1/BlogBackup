@@ -32,20 +32,20 @@ test('summer/winter offsets and visible forum timestamps match the original post
   assert.equal(sourceTime('2026-02-30 10:00:00'), null);
 });
 
-test('regression: September 28 early-morning posts belong in the 36-hour window', async () => {
+test('regression: September 28 early-morning posts belong in the 48-hour window', async () => {
   const now = Date.parse('2026-09-29T18:50:00Z');
-  const html = listing([row(1, '09/28/2026 06:16:53'), row(2, '09/28/2026 04:26:30'), row(3, '09/27/2026 23:49:59')]);
+  const html = listing([row(1, '09/28/2026 06:16:53'), row(2, '09/28/2026 04:26:30'), row(3, '09/27/2026 11:49:59')]);
   const result = await searchRecentBbs({ forumId: 'romance' }, { now, read: async () => html });
   assert.deepEqual(result.results.map((r) => r.sourceUrl), [url(1), url(2)]);
-  assert.equal(Date.parse(result.startedAt) - Date.parse(result.windowStart), 36 * 3600000);
-  assert.equal(formatForumTime(result.windowStart), '2026-09-27 23:50:00');
+  assert.equal(Date.parse(result.startedAt) - Date.parse(result.windowStart), 48 * 3600000);
+  assert.equal(formatForumTime(result.windowStart), '2026-09-27 11:50:00');
 });
 
-test('36 hours remains elapsed time across daylight saving changes', async () => {
+test('48 hours remains elapsed time across daylight saving changes', async () => {
   const now = Date.parse('2026-03-09T18:00:00Z');
-  const result = await searchRecentBbs({ forumId: 'romance' }, { now, read: async () => listing([row(1, '03/07/2026 22:00:00'), row(2, '03/07/2026 21:59:59')]) });
+  const result = await searchRecentBbs({ forumId: 'romance' }, { now, read: async () => listing([row(1, '03/07/2026 10:00:00'), row(2, '03/07/2026 09:59:59')]) });
   assert.deepEqual(result.results.map((r) => r.sourceUrl), [url(1)]);
-  assert.equal(Date.parse(result.startedAt) - Date.parse(result.windowStart), 36 * 3600000);
+  assert.equal(Date.parse(result.startedAt) - Date.parse(result.windowStart), 48 * 3600000);
 });
 
 test('only thread roots, not newer replies, are listed', () => {
@@ -55,8 +55,8 @@ test('only thread roots, not newer replies, are listed', () => {
   assert.equal(parsed.results[0].author, '作者1');
 });
 
-test('36-hour boundaries are inclusive; older and future posts are excluded', async () => {
-  const html = listing([row(1, '09/28/2026 00:00:00'), row(2, '09/27/2026 23:59:59'), row(3, '09/29/2026 12:00:00'), row(4, '09/29/2026 12:00:01')]);
+test('48-hour boundaries are inclusive; older and future posts are excluded', async () => {
+  const html = listing([row(1, '09/27/2026 12:00:00'), row(2, '09/27/2026 11:59:59'), row(3, '09/29/2026 12:00:00'), row(4, '09/29/2026 12:00:01')]);
   const result = await searchRecentBbs({ forumId: 'romance' }, { now: NOW, read: async () => html });
   assert.deepEqual(result.results.map((r) => r.sourceUrl), [url(3), url(1)]);
 });

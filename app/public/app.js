@@ -395,11 +395,11 @@ function renderBbsResults(data) {
   //bbsSearchSummary.textContent = `找到 ${data.results.length} 条结果${pages}${total}。`;
   bbsSearchSummary.textContent = `${total}。`;
   if (data.searchMode === 'recommend') {
-    bbsSearchSummary.textContent = `${data.complete ? '最近 36 小时共' : '已读取'} ${data.results.length} 篇主题帖${data.complete ? '' : '（结果尚不完整）'}。`;
+    bbsSearchSummary.textContent = `${data.complete ? '最近 48 小时共' : '已读取'} ${data.results.length} 篇主题帖${data.complete ? '' : '（结果尚不完整）'}。`;
   }
   bbsSearchWindow.hidden = data.searchMode !== 'recommend' || !data.windowStart || !data.startedAt;
   bbsSearchWindow.textContent = bbsSearchWindow.hidden ? ''
-    : `检索范围：${RecommendTemplate.formatForumTime(data.windowStart)} 至 ${RecommendTemplate.formatForumTime(data.startedAt)}（论坛时间／美西，共 36 小时）。`;
+    : `检索范围：${RecommendTemplate.formatForumTime(data.windowStart)} 至 ${RecommendTemplate.formatForumTime(data.startedAt)}（论坛时间／美西，共 48 小时）。`;
   bbsResultsPanel.hidden = false;
   bbsStartButton.hidden = data.searchMode !== 'author';
   bbsCollectionButton.hidden = data.searchMode !== 'title';
@@ -611,7 +611,7 @@ bbsSearchButton.addEventListener('click', async () => {
   const controller = bbsAbortController;
   bbsSearchButton.disabled = true;
   setStatus('running');
-  appendSystemLine(searchMode === 'recommend' ? `正在读取 ${forum.name} 最近 36 小时的所有主题帖...` : `正在${searchMode === 'author' ? '按作者' : '按标题'}搜索 ${forum.name}...`);
+  appendSystemLine(searchMode === 'recommend' ? `正在读取 ${forum.name} 最近 48 小时的所有主题帖...` : `正在${searchMode === 'author' ? '按作者' : '按标题'}搜索 ${forum.name}...`);
 
   try {
     if (searchMode === 'recommend') {
@@ -703,7 +703,7 @@ async function searchRecentPosts(forum, requestId, controller) {
       data.results.forEach((post) => posts.set(post.sourceUrl, post));
       (data.warnings || []).forEach((warning) => warnings.add(warning));
       lastData = data;
-      appendSystemLine(`已读取第 ${page} 页，找到 ${posts.size} 篇最近 36 小时的主题帖。`);
+      appendSystemLine(`已读取第 ${page} 页，找到 ${posts.size} 篇最近 48 小时的主题帖。`);
       if (data.nextPage !== null && data.nextPage !== page + 1) throw new Error('分页异常，请重新搜索。');
       page = data.nextPage;
     }
