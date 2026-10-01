@@ -48,6 +48,9 @@ let moderatorPreflight = false;
 const moderatorPanel = document.createElement('div');
 moderatorPanel.innerHTML = '<button id="moderator-connect" type="button">连接文学城版主账号（可选）</button><button id="moderator-retry" type="button" hidden>登录后检查 / 重试</button><button id="moderator-disconnect" type="button" hidden>断开连接</button><p id="moderator-status" class="muted" role="status">未连接：所有功能均可使用。</p><p class="muted">需安装“文学城推贴状态助手”扩展。账号密码只在文学城官方页面输入。</p>';
 bbsForum.parentElement.after(moderatorPanel);
+const helperInstall = document.createElement('p');
+helperInstall.innerHTML = '<a href="/downloads/wenxuecity-helper.zip" download>Download Helper ZIP</a> · <a href="/install-helper.html" target="_blank" rel="noopener">Installation instructions (English)</a>';
+moderatorPanel.append(helperInstall);
 const moderatorStatus = moderatorPanel.querySelector('#moderator-status');
 function updateModeratorRows() {
   bbsResultsList.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => {

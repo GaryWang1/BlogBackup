@@ -22,4 +22,4 @@ for (const relativePath of required) {
   }
 }
 
-console.log('Netlify build verification passed.');
+require('./package-helper.cjs')().then(() => console.log('Netlify build verification passed.')).catch((error) => { console.error(error); process.exitCode = 1; });
