@@ -16,6 +16,7 @@ async function packageHelper() {
     archive.file(path.join(root, 'moderator-extension', name), { name, date: new Date('2026-01-01T00:00:00Z') });
   }
   archive.file(path.join(root, 'app/public/install-helper.html'), { name: 'INSTALL.html', date: new Date('2026-01-01T00:00:00Z') });
+  archive.file(path.join(root, 'app/public/install-helper-zh.html'), { name: 'INSTALL-zh.html', date: new Date('2026-01-01T00:00:00Z') });
   await archive.finalize(); await done;
   console.log('Helper ZIP generated.');
 }

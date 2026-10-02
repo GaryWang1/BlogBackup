@@ -4,7 +4,7 @@
   window.addEventListener('message', (event) => {
     const message = event.data;
     if (event.source !== window || event.origin !== location.origin || message?.channel !== 'wxc-moderator-request') return;
-    if (!['connect', 'check', 'cancel', 'disconnect'].includes(message.action) || typeof message.id !== 'string') return;
+    if (!['connect', 'identity', 'check', 'cancel', 'disconnect'].includes(message.action) || typeof message.id !== 'string') return;
     try {
       if (!port) {
         port = chrome.runtime.connect({ name: 'moderator' });

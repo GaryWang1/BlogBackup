@@ -2,7 +2,7 @@ const cheerio = require('cheerio');
 const { API, resolveGeminiModel, apiError } = require('./gemini-client');
 
 const HOME = 'https://bbs.wenxuecity.com/';
-const WINDOW_MS = 48 * 60 * 60 * 1000;
+const ALLOWED_HOURS = [24, 36, 48, 72, 96, 120, 144, 168];
 const SOURCE_TIME_ZONE = 'America/Los_Angeles';
 const forumClock = new Intl.DateTimeFormat('en-CA', {
   timeZone: SOURCE_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -123,15 +123,17 @@ async function mapLimited(items, limit, fn) {
 }
 
 // One source page per API call keeps busy forums within Netlify request timeouts.
-// The browser follows nextPage until the entire 48-hour window is covered.
-async function searchRecentBbs({ forumId: id, forumName, page = 1, startedAt }, { read = fetchPage, now = Date.now() } = {}) {
+// The browser follows nextPage until the entire selected time window is covered.
+async function searchRecentBbs({ forumId: id, forumName, page = 1, startedAt, hours = 36 }, { read = fetchPage, now = Date.now() } = {}) {
   const forum = forumId(id);
   page = Number(page);
   const end = startedAt ? Date.parse(startedAt) : now;
   if (!Number.isInteger(page) || page < 1 || !Number.isFinite(end) || end > now + 60000 || end < now - 24 * 3600000) {
     throw new Error('搜索已过期或页码无效，请重新搜索。');
   }
-  const start = end - WINDOW_MS;
+  hours = Number(hours);
+  if (!ALLOWED_HOURS.includes(hours)) throw new Error('请选择有效的推贴时间范围。');
+  const start = end - hours * 3600000;
   const searchUrl = `${HOME}${forum}/?page=${page}`;
   const parsed = parseListing(await read(searchUrl), forum, clean(forumName), page);
   const warnings = [];
@@ -163,7 +165,7 @@ async function searchRecentBbs({ forumId: id, forumName, page = 1, startedAt }, 
   return {
     forumId: forum, forumName: clean(forumName), searchMode: 'recommend', searchUrl,
     startedAt: new Date(end).toISOString(), windowStart: new Date(start).toISOString(),
-    sourceTimeZone: SOURCE_TIME_ZONE,
+    hours, sourceTimeZone: SOURCE_TIME_ZONE,
     results: unique, page, nextPage: parsed.next && !olderPage ? page + 1 : null, warnings
   };
 }

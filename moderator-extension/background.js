@@ -25,6 +25,18 @@ chrome.runtime.onConnect.addListener((port) => {
       } catch { send({ id, done: true, error: '无法打开文学城页面' }); }
       return;
     }
+    if (action === 'identity') {
+      const token = generation;
+      let username = '';
+      if (connected) {
+        try {
+          const values = await chrome.scripting.executeScript({ target: { tabId }, func: readModeratorIdentity });
+          username = String(values[0]?.result || '').slice(0, 100);
+        } catch {}
+      }
+      if (token === generation) send({ id, done: true, username });
+      return;
+    }
     if (action !== 'check') return;
     if (!connected || !Array.isArray(urls) || urls.length > 10 || !urls.length || urls.some((url) => typeof url !== 'string' || !new RegExp(`^https://bbs\\.wenxuecity\\.com/${forum}/\\d+\\.html$`).test(url))) {
       send({ id, done: true, error: '请重新连接；每次只能检查当前论坛的 1–10 篇帖子' }); return;

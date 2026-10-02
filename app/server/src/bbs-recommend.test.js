@@ -4,6 +4,14 @@ const { searchRecentBbs, recommendBbs, validateSelection, parseListing, parseArt
 const { formatLetter, localDate, formatForumTime } = require('../../public/recommend-template');
 
 const NOW = Date.parse('2026-09-29T19:00:00Z'); // Noon at the forum (PDT).
+test('recommendation range defaults to 36 hours and accepts only listed ranges', async () => {
+  for (const hours of [undefined, 24, 36, 48, 72, 96, 120, 144, 168]) {
+    const result = await searchRecentBbs({ forumId: 'romance', hours }, { now: NOW, read: async () => listing([]) });
+    assert.equal(result.hours, hours || 36);
+    assert.equal(Date.parse(result.startedAt) - Date.parse(result.windowStart), (hours || 36) * 3600000);
+  }
+  for (const hours of [0, 25, 169, -1, 'oops']) await assert.rejects(searchRecentBbs({ forumId: 'romance', hours }, { now: NOW, read: async () => listing([]) }), /时间范围/);
+});
 const url = (id) => `https://bbs.wenxuecity.com/romance/${id}.html`;
 function row(id, time, indent = 0) {
   return `<p style="margin:2px 0 2px ${indent}px"><a class="post" href="./${id}.html">作品${id}</a><span class="b"><a class="b">作者${id}</a></span><small>${time}</small></p>`;
@@ -35,7 +43,7 @@ test('summer/winter offsets and visible forum timestamps match the original post
 test('regression: September 28 early-morning posts belong in the 48-hour window', async () => {
   const now = Date.parse('2026-09-29T18:50:00Z');
   const html = listing([row(1, '09/28/2026 06:16:53'), row(2, '09/28/2026 04:26:30'), row(3, '09/27/2026 11:49:59')]);
-  const result = await searchRecentBbs({ forumId: 'romance' }, { now, read: async () => html });
+  const result = await searchRecentBbs({ hours: 48, forumId: 'romance' }, { now, read: async () => html });
   assert.deepEqual(result.results.map((r) => r.sourceUrl), [url(1), url(2)]);
   assert.equal(Date.parse(result.startedAt) - Date.parse(result.windowStart), 48 * 3600000);
   assert.equal(formatForumTime(result.windowStart), '2026-09-27 11:50:00');
@@ -43,7 +51,7 @@ test('regression: September 28 early-morning posts belong in the 48-hour window'
 
 test('48 hours remains elapsed time across daylight saving changes', async () => {
   const now = Date.parse('2026-03-09T18:00:00Z');
-  const result = await searchRecentBbs({ forumId: 'romance' }, { now, read: async () => listing([row(1, '03/07/2026 10:00:00'), row(2, '03/07/2026 09:59:59')]) });
+  const result = await searchRecentBbs({ hours: 48, forumId: 'romance' }, { now, read: async () => listing([row(1, '03/07/2026 10:00:00'), row(2, '03/07/2026 09:59:59')]) });
   assert.deepEqual(result.results.map((r) => r.sourceUrl), [url(1)]);
   assert.equal(Date.parse(result.startedAt) - Date.parse(result.windowStart), 48 * 3600000);
 });
@@ -57,43 +65,43 @@ test('only thread roots, not newer replies, are listed', () => {
 
 test('48-hour boundaries are inclusive; older and future posts are excluded', async () => {
   const html = listing([row(1, '09/27/2026 12:00:00'), row(2, '09/27/2026 11:59:59'), row(3, '09/29/2026 12:00:00'), row(4, '09/29/2026 12:00:01')]);
-  const result = await searchRecentBbs({ forumId: 'romance' }, { now: NOW, read: async () => html });
+  const result = await searchRecentBbs({ hours: 48, forumId: 'romance' }, { now: NOW, read: async () => html });
   assert.deepEqual(result.results.map((r) => r.sourceUrl), [url(3), url(1)]);
 });
 
 test('pagination exceeds old search limits and stops only after an entirely older page', async () => {
   for (const page of [1, 3, 4, 12]) {
-    const result = await searchRecentBbs({ forumId: 'romance', page }, { now: NOW, read: async () => listing([row(1, '09/29/2026 01:00:00'), row(2, '09/27/2026 01:00:00')], page + 1) });
+    const result = await searchRecentBbs({ hours: 48, forumId: 'romance', page }, { now: NOW, read: async () => listing([row(1, '09/29/2026 01:00:00'), row(2, '09/27/2026 01:00:00')], page + 1) });
     assert.equal(result.nextPage, page + 1);
   }
-  const result = await searchRecentBbs({ forumId: 'romance', page: 5 }, { now: NOW, read: async () => listing([row(3, '09/27/2026 01:00:00')], 6) });
+  const result = await searchRecentBbs({ hours: 48, forumId: 'romance', page: 5 }, { now: NOW, read: async () => listing([row(3, '09/27/2026 01:00:00')], 6) });
   assert.equal(result.nextPage, null);
 });
 
 test('all roots are retained even when a page has more than 80 results', async () => {
-  const result = await searchRecentBbs({ forumId: 'romance' }, { now: NOW, read: async () => listing(Array.from({ length: 90 }, (_, i) => row(i, '09/29/2026 01:00:00'))) });
+  const result = await searchRecentBbs({ hours: 48, forumId: 'romance' }, { now: NOW, read: async () => listing(Array.from({ length: 90 }, (_, i) => row(i, '09/29/2026 01:00:00'))) });
   assert.equal(result.results.length, 90);
 });
 
 test('sticky posts are date-filtered and deduplicated', async () => {
   const html = listing([row(1, '09/29/2026 01:00:00')], '', '<a class="sticky" href="./1.html">same</a><a class="sticky" href="./2.html">old</a><a class="sticky" href="./3.html">recent</a>');
   const read = async (address) => address.includes('?page=') ? html : article(1, undefined, address === url(2) ? '2026-08-01 00:00:00' : '2026-09-29 01:00:00');
-  const result = await searchRecentBbs({ forumId: 'romance' }, { now: NOW, read });
+  const result = await searchRecentBbs({ hours: 48, forumId: 'romance' }, { now: NOW, read });
   assert.deepEqual(result.results.map((r) => r.sourceUrl).sort(), [url(1), url(3)]);
 });
 
 test('unknown dates and failed sticky reads explicitly mark incomplete coverage', async () => {
   const html = listing([row(1, 'bad date')], 2, '<a class="sticky" href="./2.html">sticky</a>');
-  const result = await searchRecentBbs({ forumId: 'romance' }, { now: NOW, read: async (address) => { if (!address.includes('?page=')) throw new Error('network'); return html; } });
+  const result = await searchRecentBbs({ hours: 48, forumId: 'romance' }, { now: NOW, read: async (address) => { if (!address.includes('?page=')) throw new Error('network'); return html; } });
   assert.equal(result.nextPage, 2);
   assert.equal(result.warnings.length, 2);
 });
 
 test('search snapshot remains fixed across pages and invalid input is rejected', async () => {
-  const result = await searchRecentBbs({ forumId: 'romance', page: 2, startedAt: new Date(NOW).toISOString() }, { now: NOW + 10000, read: async () => listing([row(1, '09/28/2026 00:00:00')]) });
+  const result = await searchRecentBbs({ hours: 48, forumId: 'romance', page: 2, startedAt: new Date(NOW).toISOString() }, { now: NOW + 10000, read: async () => listing([row(1, '09/28/2026 00:00:00')]) });
   assert.equal(result.results.length, 1);
   await assert.rejects(searchRecentBbs({ forumId: '../x' }), /有效/);
-  await assert.rejects(searchRecentBbs({ forumId: 'romance', page: -1 }), /页码/);
+  await assert.rejects(searchRecentBbs({ hours: 48, forumId: 'romance', page: -1 }), /页码/);
 });
 
 test('selection validates count, duplicates, origin and current forum', () => {

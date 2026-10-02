@@ -24,3 +24,14 @@ async function readModeratorPost(sourceUrl) {
   } catch { return unknown('读取失败或登录已过期，请重试'); }
 }
 if (typeof module !== 'undefined') module.exports = readModeratorPost;
+function readModeratorIdentity() {
+  if (location.origin !== 'https://bbs.wenxuecity.com') return '';
+  const anchor = document.querySelector('#toploginbox #login_in_box .username a[href]');
+  if (!anchor) return '';
+  try {
+    const link = new URL(anchor.getAttribute('href'), location.href);
+    if (link.origin !== location.origin || link.pathname !== '/members/' || !link.searchParams.get('u')) return '';
+    return anchor.textContent.replace(/\s+/g, ' ').trim().slice(0, 100);
+  } catch { return ''; }
+}
+if (typeof module !== 'undefined') module.exports.readModeratorIdentity = readModeratorIdentity;

@@ -43,13 +43,15 @@ const usageToggle = document.querySelector('#usage-toggle');
 const usagePanel = document.querySelector('#usage-panel');
 const runtimeToggle = document.querySelector('#runtime-toggle');
 const runtimeNotice = document.querySelector('#runtime-notice');
+const bbsHours = document.querySelector('#bbs-hours');
+bbsHours.addEventListener('change', clearBbsResults);
 const moderator = new ModeratorController(updateModeratorRows);
 let moderatorPreflight = false;
 const moderatorPanel = document.createElement('div');
 moderatorPanel.innerHTML = '<button id="moderator-connect" type="button">连接文学城版主账号（可选）</button><button id="moderator-retry" type="button" hidden>登录后检查 / 重试</button><button id="moderator-disconnect" type="button" hidden>断开连接</button><p id="moderator-status" class="muted" role="status">未连接：所有功能均可使用。</p><p class="muted">需安装“文学城推贴状态助手”扩展。账号密码只在文学城官方页面输入。</p>';
 bbsForum.parentElement.after(moderatorPanel);
 const helperInstall = document.createElement('p');
-helperInstall.innerHTML = '<a href="/downloads/wenxuecity-helper.zip" download>Download Helper ZIP</a> · <a href="/install-helper.html" target="_blank" rel="noopener">Installation instructions (English)</a>';
+helperInstall.innerHTML = '<a href="/downloads/wenxuecity-helper.zip" download>Download Helper ZIP</a> · <a href="/install-helper-zh.html" target="_blank" rel="noopener">中文安装说明</a> · <a href="/install-helper.html" target="_blank" rel="noopener">Installation instructions (English)</a>';
 moderatorPanel.append(helperInstall);
 const moderatorStatus = moderatorPanel.querySelector('#moderator-status');
 function updateModeratorRows() {
@@ -66,9 +68,22 @@ function updateModeratorRows() {
   updateStartState();
 }
 async function checkModeratorResults() {
-  if (moderatorPreflight) return;
+  if (moderatorPreflight || recommendBusy) return;
+  await updateModeratorIdentity();
   if (moderator.connected && bbsSearchState?.searchMode === 'recommend') {
     await moderator.check(bbsSearchState.forumId, bbsSearchState.results.map((p) => p.sourceUrl));
+  }
+}
+async function updateModeratorIdentity() {
+  if (!moderator.connected) return;
+  const version = moderator.version;
+  try {
+    const reply = await moderator.request('identity', selectedForum().id);
+    if (!moderator.connected || version !== moderator.version) return;
+    const username = typeof reply?.username === 'string' ? reply.username.trim().slice(0, 100) : '';
+    moderatorStatus.textContent = username ? `已连接文学城：${username}。` : '已连接文学城。';
+  } catch {
+    if (moderator.connected && version === moderator.version) moderatorStatus.textContent = '已连接文学城。';
   }
 }
 moderatorPanel.querySelector('#moderator-connect').addEventListener('click', async () => {
@@ -76,14 +91,16 @@ moderatorPanel.querySelector('#moderator-connect').addEventListener('click', asy
   button.disabled = true;
   try {
     await moderator.connect(selectedForum().id);
-    moderatorStatus.textContent = '助手已连接。请在文学城页面登录当前论坛的版主账号，返回后点击“登录后检查 / 重试”。';
-    moderatorPanel.querySelector('#moderator-retry').hidden = false;
-    moderatorPanel.querySelector('#moderator-disconnect').hidden = false;
-    button.hidden = true;
+    moderatorStatus.textContent = '已连接文学城。';
+    for (const child of moderatorPanel.children) child.hidden = child !== moderatorStatus;
+    await checkModeratorResults();
   } catch (error) { moderatorStatus.textContent = error.message; }
   finally { button.disabled = false; }
 });
 moderatorPanel.querySelector('#moderator-retry').addEventListener('click', checkModeratorResults);
+window.addEventListener('focus', () => {
+  if (moderator.connected && ![...moderator.states.values()].some((s) => s.status === 'checking')) checkModeratorResults();
+});
 moderatorPanel.querySelector('#moderator-disconnect').addEventListener('click', () => {
   moderator.disconnect(); resetRecommendDraft(); moderatorPreflight = false;
   moderatorPanel.querySelector('#moderator-connect').hidden = false;
@@ -398,11 +415,11 @@ function renderBbsResults(data) {
   //bbsSearchSummary.textContent = `找到 ${data.results.length} 条结果${pages}${total}。`;
   bbsSearchSummary.textContent = `${total}。`;
   if (data.searchMode === 'recommend') {
-    bbsSearchSummary.textContent = `${data.complete ? '最近 48 小时共' : '已读取'} ${data.results.length} 篇主题帖${data.complete ? '' : '（结果尚不完整）'}。`;
+    bbsSearchSummary.textContent = `${data.complete ? `最近 ${data.hours || 36} 小时共` : '已读取'} ${data.results.length} 篇主题帖${data.complete ? '' : '（结果尚不完整）'}。`;
   }
   bbsSearchWindow.hidden = data.searchMode !== 'recommend' || !data.windowStart || !data.startedAt;
   bbsSearchWindow.textContent = bbsSearchWindow.hidden ? ''
-    : `检索范围：${RecommendTemplate.formatForumTime(data.windowStart)} 至 ${RecommendTemplate.formatForumTime(data.startedAt)}（论坛时间／美西，共 48 小时）。`;
+    : `检索范围：${RecommendTemplate.formatForumTime(data.windowStart)} 至 ${RecommendTemplate.formatForumTime(data.startedAt)}（论坛时间／美西，共 ${data.hours || 36} 小时）。`;
   bbsResultsPanel.hidden = false;
   bbsStartButton.hidden = data.searchMode !== 'author';
   bbsCollectionButton.hidden = data.searchMode !== 'title';
@@ -614,7 +631,7 @@ bbsSearchButton.addEventListener('click', async () => {
   const controller = bbsAbortController;
   bbsSearchButton.disabled = true;
   setStatus('running');
-  appendSystemLine(searchMode === 'recommend' ? `正在读取 ${forum.name} 最近 48 小时的所有主题帖...` : `正在${searchMode === 'author' ? '按作者' : '按标题'}搜索 ${forum.name}...`);
+  appendSystemLine(searchMode === 'recommend' ? `正在读取 ${forum.name} 最近 ${bbsHours.value} 小时的所有主题帖...` : `正在${searchMode === 'author' ? '按作者' : '按标题'}搜索 ${forum.name}...`);
 
   try {
     if (searchMode === 'recommend') {
@@ -687,6 +704,7 @@ bbsStartButton.addEventListener('click', () => {
 });
 
 async function searchRecentPosts(forum, requestId, controller) {
+  const hours = Number(bbsHours.value);
   const posts = new Map();
   const warnings = new Set();
   let page = 1;
@@ -697,7 +715,7 @@ async function searchRecentPosts(forum, requestId, controller) {
       const response = await fetch('/api/bbs/search', {
         method: 'POST', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(60000)]),
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ forumId: forum.id, forumName: forum.name, searchMode: 'recommend', page, startedAt })
+        body: JSON.stringify({ forumId: forum.id, forumName: forum.name, searchMode: 'recommend', page, startedAt, hours })
       });
       const data = await response.json();
       if (requestId !== bbsRequestId) return;
@@ -706,7 +724,7 @@ async function searchRecentPosts(forum, requestId, controller) {
       data.results.forEach((post) => posts.set(post.sourceUrl, post));
       (data.warnings || []).forEach((warning) => warnings.add(warning));
       lastData = data;
-      appendSystemLine(`已读取第 ${page} 页，找到 ${posts.size} 篇最近 48 小时的主题帖。`);
+      appendSystemLine(`已读取第 ${page} 页，找到 ${posts.size} 篇最近 ${hours} 小时的主题帖。`);
       if (data.nextPage !== null && data.nextPage !== page + 1) throw new Error('分页异常，请重新搜索。');
       page = data.nextPage;
     }
@@ -719,7 +737,7 @@ async function searchRecentPosts(forum, requestId, controller) {
     setStatus('failed');
   }
   if (requestId !== bbsRequestId) return;
-  renderBbsResults({ ...lastData, searchMode: 'recommend', forumId: forum.id, forumName: forum.name,
+  renderBbsResults({ ...lastData, hours, searchMode: 'recommend', forumId: forum.id, forumName: forum.name,
     results: [...posts.values()].sort((a, b) => b.publishedAt - a.publishedAt), complete: !page && !warnings.size });
 }
 
@@ -1128,6 +1146,7 @@ function updateSourceTypeUI() {
 function updateBbsKeywordLabel() {
   const searchMode = currentBbsSearchMode();
   document.querySelector('#bbs-keyword-field').hidden = searchMode === 'recommend';
+  document.querySelector('#bbs-hours-field').hidden = searchMode !== 'recommend';
   document.querySelector('#bbs-recommend-hint').hidden = searchMode !== 'recommend';
   bbsKeyword.disabled = searchMode === 'recommend';
   const label = document.querySelector('#bbs-keyword-label');

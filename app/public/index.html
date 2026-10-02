@@ -30,7 +30,7 @@
           <li><strong>博客备份。</strong>粘贴博主博客首页网址，例如 <code>https://blog.wenxuecity.com/myoverview/41038/</code>，点击“下一步”，勾选要保存的分类，再点击“开始下载”。</li>
           <li><strong>论坛备份。</strong>选择“论坛”后直接选择论坛版块；然后用“文学城ID”按作者查找。挑选打算下载的帖子，选中结果后可以“开始下载”。</li>
           <li><strong>制作合集。</strong>选择“论坛”后直接选择论坛版块；然后用“关键词”按标题查找。选中结果后点击“做合集”。</li>
-          <li><strong>推贴。</strong>选择“推贴”，无需搜索词，点击“下一步”读取当前论坛最近 48 小时的所有主题帖（不含跟帖）。选择 1–5 篇后点击“推贴”，自动阅读正文并生成推荐原因；检查、编辑推荐信后点击“一键复制”。</li>
+          <li><strong>推贴。</strong>选择“推贴”，无需搜索词，点击“下一步”读取当前论坛所选时间范围内的所有主题帖（不含跟帖）。选择 1–5 篇后点击“推贴”，自动阅读正文并生成推荐原因；检查、编辑推荐信后点击“一键复制”。</li>
 		  <li><strong>增量下载。</strong>默认只下载新增文章或帖子；如果想重新下载保存已归档内容，取消“增量下载”。</li>
           <li><strong>跟帖保存。</strong>勾选“包含跟帖”后，文章页面会尽量保存评论、跟帖和相关资源。</li>
           <li><strong>离线阅读。</strong>下载完成后点击右上角“阅读”，进入归档首页；也可以在归档页、博客页和分类页用搜索框按页面标题或正文内容查找已保存内容。</li>
@@ -124,7 +124,8 @@
               <span id="bbs-keyword-label">文学城ID</span>
               <input id="bbs-keyword" name="bbsKeyword" type="text" autocomplete="off">
             </label>
-            <p id="bbs-recommend-hint" class="muted" hidden>搜索当前论坛最近 48 小时的所有主题帖，无需搜索词。请选择 1–5 篇生成推荐信。</p>
+            <label id="bbs-hours-field" hidden>推贴时间范围<select id="bbs-hours"><option value="24">最近 24 小时</option><option value="36" selected>最近 36 小时</option><option value="48">最近 48 小时</option><option value="72">最近 72 小时（3 天）</option><option value="96">最近 96 小时（4 天）</option><option value="120">最近 120 小时（5 天）</option><option value="144">最近 144 小时（6 天）</option><option value="168">最近 168 小时（7 天）</option></select></label>
+            <p id="bbs-recommend-hint" class="muted" hidden>搜索当前论坛所选时间范围内的所有主题帖，无需搜索词。请选择 1–5 篇生成推荐信。</p>
 
             <button id="bbs-search-button" type="button">下一步</button>
 

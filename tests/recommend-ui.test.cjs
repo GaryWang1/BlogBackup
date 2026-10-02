@@ -46,7 +46,7 @@ async function setup(t, overrides = {}) {
       searches.push(body);
       if (overrides.search) return overrides.search(route, body);
       if (body.searchMode !== 'recommend') return json({ ...body, results: posts, totalCount: 7 });
-      return json({ ...body, results: body.page === 1 ? posts : [], startedAt: '2026-09-29T19:00:00Z', windowStart: '2026-09-27T19:00:00Z', nextPage: body.page === 1 ? 2 : null, warnings: [] });
+      return json({ ...body, results: body.page === 1 ? posts : [], startedAt: '2026-09-29T19:00:00Z', windowStart: new Date(Date.parse('2026-09-29T19:00:00Z') - (body.hours || 36) * 3600000).toISOString(), nextPage: body.page === 1 ? 2 : null, warnings: [] });
     }
     if (pathname === '/api/bbs/recommend') {
       if (overrides.recommend) return overrides.recommend(route, body);
@@ -70,8 +70,8 @@ test('no search term required; all pages load; select 1–5; generate, edit and 
   assert.equal(await page.locator('#bbs-results-list input').count(), 7);
   assert.equal(searches.length, 2);
   assert.ok(searches.every((r) => !r.keyword));
-  assert.match(await page.locator('#bbs-search-summary').innerText(), /最近 48 小时共 7/);
-  assert.equal(await page.locator('#bbs-search-window').innerText(), '检索范围：2026-09-27 12:00:00 至 2026-09-29 12:00:00（论坛时间／美西，共 48 小时）。');
+  assert.match(await page.locator('#bbs-search-summary').innerText(), /最近 36 小时共 7/);
+  assert.equal(await page.locator('#bbs-search-window').innerText(), '检索范围：2026-09-28 00:00:00 至 2026-09-29 12:00:00（论坛时间／美西，共 36 小时）。');
   assert.match(await page.locator('#bbs-results-list .category-meta').first().innerText(), /2026-09-28 18:00:00（美西）/);
   assert.equal(await page.locator('#bbs-recommend-button').isDisabled(), true);
   for (let i = 0; i < 5; i++) await page.locator('#bbs-results-list input').nth(i).check();
@@ -169,7 +169,9 @@ test('moderator checks disable recommended posts, allow unknown, recheck before 
     });
   });
   await page.locator('#moderator-connect').click();
-  await page.locator('#moderator-disconnect').waitFor({ state: 'visible' });
+  await page.waitForFunction(() => document.querySelector('#moderator-status').textContent === '已连接文学城。');
+  assert.equal(await page.locator('#moderator-disconnect').isVisible(), false);
+  assert.equal(await page.getByText('Installation instructions (English)', { exact: true }).isVisible(), false);
   await page.locator('#bbs-search-button').click();
   await page.waitForFunction(() => document.querySelector('.moderator-state')?.textContent.includes('已推荐'));
   const inputs = page.locator('#bbs-results-list input');
@@ -182,7 +184,7 @@ test('moderator checks disable recommended posts, allow unknown, recheck before 
   assert.equal(await inputs.nth(1).isChecked(), false);
   assert.equal(await inputs.nth(1).isDisabled(), true);
   assert.equal(await page.locator('#recommend-reasons textarea').count(), 1);
-  await page.locator('#moderator-disconnect').click();
+  await page.evaluate(() => document.querySelector('#moderator-disconnect').click());
   assert.equal(await inputs.nth(0).isDisabled(), false);
   assert.equal(await page.locator('.moderator-state').first().innerText(), '');
 });
@@ -216,6 +218,19 @@ test('moderator controller batches checks and ignores results after forum reset'
   assert.deepEqual(result, { sizes: [10, 10, 3, 1], count: 23, remaining: 0 });
 });
 
+test('recommendation dropdown defaults to 36 and passes 168 through pagination', async (t) => {
+  const { page, searches } = await setup(t);
+  assert.equal(await page.locator('#bbs-hours').inputValue(), '36');
+  await page.locator('#bbs-hours').selectOption('168');
+  await page.locator('#bbs-search-button').click();
+  await page.locator('#bbs-results-panel').waitFor({ state: 'visible' });
+  assert.equal(searches.length, 2);
+  assert.ok(searches.every((r) => r.hours === 168));
+  assert.match(await page.locator('#bbs-search-summary').innerText(), /168 小时/);
+  await page.locator('#bbs-hours').selectOption('24');
+  assert.equal(await page.locator('#bbs-results-panel').isVisible(), false);
+});
+
 test('moderator reader validates admin menu and ignores body spoofing', async (t) => {
   const context = await browser.newContext();
   t.after(() => context.close());
@@ -223,6 +238,12 @@ test('moderator reader validates admin menu and ignores body spoofing', async (t
   await page.route('https://bbs.wenxuecity.com/**', (route) => route.fulfill({ body: '<html></html>', contentType: 'text/html' }));
   await page.goto('https://bbs.wenxuecity.com/romance/');
   const reader = require('../moderator-extension/reader.js');
+  await page.setContent('<div id="toploginbox"><div id="login_in_box"><span class="username"><a href="/members/?u=幸福生">幸福生</a></span></div></div><div id="postmeta"><a class="username">不是登录者</a></div>');
+  assert.equal(await page.evaluate(reader.readModeratorIdentity), '幸福生');
+  await page.setContent('<div id="postmeta"><a class="username">不是登录者</a></div>');
+  assert.equal(await page.evaluate(reader.readModeratorIdentity), '');
+  await page.setContent('<div id="toploginbox"><div id="login_in_box"><span class="username"><a href="https://example.com/members/?u=假名">假名</a></span></div></div>');
+  assert.equal(await page.evaluate(reader.readModeratorIdentity), '');
   const sourceUrl = 'https://bbs.wenxuecity.com/romance/123.html';
   const base = '<h1 class="title">标题</h1><div id="postmeta">作者</div>';
   const menu = '<a class="moderator" href="/romance/moderator/menu/123/?backSubid=romance">管理菜单</a>';
