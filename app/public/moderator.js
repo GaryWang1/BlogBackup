@@ -24,7 +24,7 @@ class ModeratorController {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(action === 'connect' ? '未检测到助手扩展。请先安装扩展并刷新本页。' : '检查超时，请登录文学城后重试。'));
-      }, action === 'identity' ? 3000 : action === 'connect' ? 5000 : 65000);
+      }, action === 'identity' ? 10000 : action === 'connect' ? 5000 : 65000);
       this.pending.set(id, { resolve, reject, timer, onResult });
       window.postMessage({ channel: 'wxc-moderator-request', id, action, forum, urls }, location.origin);
     });

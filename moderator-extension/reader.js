@@ -24,14 +24,31 @@ async function readModeratorPost(sourceUrl) {
   } catch { return unknown('读取失败或登录已过期，请重试'); }
 }
 if (typeof module !== 'undefined') module.exports = readModeratorPost;
-function readModeratorIdentity() {
+async function readModeratorIdentity() {
   if (location.origin !== 'https://bbs.wenxuecity.com') return '';
-  const anchor = document.querySelector('#toploginbox #login_in_box .username a[href]');
-  if (!anchor) return '';
+  const extract = (doc) => {
+    // Restrict discovery to the login header, never post authors or article text.
+    const anchors = doc.querySelectorAll('#login_in_box .username a, #toploginbox .username a, #topnav .username a');
+    for (const anchor of anchors) {
+      try {
+        const link = new URL(anchor.getAttribute('href'), location.href);
+        if (!['bbs.wenxuecity.com', 'www.wenxuecity.com', 'wenxuecity.com'].includes(link.hostname) || !['https:', 'http:'].includes(link.protocol) || !/^\/members\/?$/.test(link.pathname) || !link.searchParams.get('u')) continue;
+        const name = anchor.textContent.replace(/\s+/g, ' ').trim();
+        if (name) return name.slice(0, 100);
+      } catch {}
+    }
+    return '';
+  };
+  // The login header can be inserted after the initial navigation completes.
+  for (let attempt = 0; attempt < 9; attempt++) {
+    const username = extract(document);
+    if (username) return username;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
   try {
-    const link = new URL(anchor.getAttribute('href'), location.href);
-    if (link.origin !== location.origin || link.pathname !== '/members/' || !link.searchParams.get('u')) return '';
-    return anchor.textContent.replace(/\s+/g, ' ').trim().slice(0, 100);
-  } catch { return ''; }
+    const response = await fetch(location.href, { credentials: 'include', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(2500) });
+    if (response.ok) return extract(new DOMParser().parseFromString(await response.text(), 'text/html'));
+  } catch {}
+  return '';
 }
 if (typeof module !== 'undefined') module.exports.readModeratorIdentity = readModeratorIdentity;

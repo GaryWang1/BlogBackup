@@ -240,6 +240,11 @@ test('moderator reader validates admin menu and ignores body spoofing', async (t
   const reader = require('../moderator-extension/reader.js');
   await page.setContent('<div id="toploginbox"><div id="login_in_box"><span class="username"><a href="/members/?u=幸福生">幸福生</a></span></div></div><div id="postmeta"><a class="username">不是登录者</a></div>');
   assert.equal(await page.evaluate(reader.readModeratorIdentity), '幸福生');
+  await page.setContent('<div id="login_in_box"></div>');
+  await page.evaluate(() => setTimeout(() => {
+    document.querySelector('#login_in_box').innerHTML = '<span class="username"><a href="https://www.wenxuecity.com/members?u=幸福生">幸福生</a></span>';
+  }, 400));
+  assert.equal(await page.evaluate(reader.readModeratorIdentity), '幸福生');
   await page.setContent('<div id="postmeta"><a class="username">不是登录者</a></div>');
   assert.equal(await page.evaluate(reader.readModeratorIdentity), '');
   await page.setContent('<div id="toploginbox"><div id="login_in_box"><span class="username"><a href="https://example.com/members/?u=假名">假名</a></span></div></div>');

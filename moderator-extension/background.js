@@ -29,10 +29,13 @@ chrome.runtime.onConnect.addListener((port) => {
       const token = generation;
       let username = '';
       if (connected) {
-        try {
-          const values = await chrome.scripting.executeScript({ target: { tabId }, func: readModeratorIdentity });
-          username = String(values[0]?.result || '').slice(0, 100);
-        } catch {}
+        for (let attempt = 0; attempt < 4 && token === generation; attempt++) {
+          try {
+            const values = await chrome.scripting.executeScript({ target: { tabId }, func: readModeratorIdentity });
+            username = String(values[0]?.result || '').slice(0, 100);
+            break;
+          } catch { await new Promise((resolve) => setTimeout(resolve, 500)); }
+        }
       }
       if (token === generation) send({ id, done: true, username });
       return;

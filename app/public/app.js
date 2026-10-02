@@ -101,6 +101,9 @@ moderatorPanel.querySelector('#moderator-retry').addEventListener('click', check
 window.addEventListener('focus', () => {
   if (moderator.connected && ![...moderator.states.values()].some((s) => s.status === 'checking')) checkModeratorResults();
 });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && moderator.connected) updateModeratorIdentity();
+});
 moderatorPanel.querySelector('#moderator-disconnect').addEventListener('click', () => {
   moderator.disconnect(); resetRecommendDraft(); moderatorPreflight = false;
   moderatorPanel.querySelector('#moderator-connect').hidden = false;
