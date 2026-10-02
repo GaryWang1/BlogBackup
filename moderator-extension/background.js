@@ -3,15 +3,23 @@ const allowedOrigins = new Set(['https://dainty-praline-c54396.netlify.app', 'ht
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'moderator' || port.sender?.frameId !== 0 || !allowedOrigins.has(new URL(port.sender.url).origin)) { port.disconnect(); return; }
   let tabId, generation = 0, connected = false;
+  const sessionKey = `moderator:${port.sender.tab?.id}:${new URL(port.sender.url).origin}`;
+  const ready = chrome.storage.session.get(sessionKey).then((data) => {
+    if (Number.isInteger(data[sessionKey]?.tabId)) { tabId = data[sessionKey].tabId; connected = true; }
+  });
   let running = Promise.resolve();
   const send = (reply) => { try { port.postMessage(reply); } catch {} };
   port.onDisconnect.addListener(() => { generation++; connected = false; });
   port.onMessage.addListener(async (message) => {
+    await ready;
     const { id, action, forum, urls } = message;
     if (typeof id !== 'string' || id.length > 100) return;
     if (action === 'cancel' || action === 'disconnect') {
       generation++;
-      if (action === 'disconnect') connected = false;
+      if (action === 'disconnect') {
+        connected = false;
+        await chrome.storage.session.remove(sessionKey);
+      }
       send({ id, done: true }); return;
     }
     if (!/^[a-zA-Z0-9_-]+$/.test(forum || '')) { send({ id, done: true, error: '论坛无效' }); return; }
@@ -21,6 +29,7 @@ chrome.runtime.onConnect.addListener((port) => {
         const tab = await chrome.tabs.create({ url: `https://bbs.wenxuecity.com/${forum}/`, active: true });
         if (token !== generation) return;
         tabId = tab.id; connected = true;
+        await chrome.storage.session.set({ [sessionKey]: { tabId } });
         send({ id, done: true });
       } catch { send({ id, done: true, error: '无法打开文学城页面' }); }
       return;
@@ -41,6 +50,9 @@ chrome.runtime.onConnect.addListener((port) => {
       return;
     }
     if (action !== 'check') return;
+    if (!connected) {
+      send({ id, done: true, error: '文学城连接已失效，请刷新阅读器后重新连接' }); return;
+    }
     if (!connected || !Array.isArray(urls) || urls.length > 10 || !urls.length || urls.some((url) => typeof url !== 'string' || !new RegExp(`^https://bbs\\.wenxuecity\\.com/${forum}/\\d+\\.html$`).test(url))) {
       send({ id, done: true, error: '请重新连接；每次只能检查当前论坛的 1–10 篇帖子' }); return;
     }
